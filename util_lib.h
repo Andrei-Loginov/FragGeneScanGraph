@@ -22,3 +22,4 @@ double log2(double a);
 void get_protein(char *dna, char *protein, int strand, int whole_genome);
 void print_usage();
   
+void print_viterbi(double **matr, int len_seq, int n_state, FILE *f);

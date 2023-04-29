@@ -376,3 +376,12 @@ void print_usage(){
   printf("%s", "       Optional parameter\n");
   printf("%s", "       [thread_num]:       the number of threads used by FragGeneScan; default is 1 thread.\n");
 }
+
+
+void print_viterbi(double **matr, int len_seq, int n_state, FILE *f){
+    for (int j = 0; j < n_state; ++j){
+        for (int i = 0; i < len_seq; ++i)
+            fprintf(f,"%lf,", matr[j][i]);
+        fprintf(f,"\n");
+    }
+}
