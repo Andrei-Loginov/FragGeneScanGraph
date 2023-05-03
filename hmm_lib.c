@@ -428,13 +428,13 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
     /******************/
     /* I' state        */
     /******************/
-    for (i=I1_STATE_1; i<=I6_STATE_1; i++) {
+        for (i=I1_STATE_1; i<=I6_STATE_1; i++) {
 
-      if (t==0){
+            if (t==0){
 
-      }else{
+            }else{
 				/* from I state */
-				j = i;
+                j = i;
 				alpha[i][t] = alpha[j][t-1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
 				path[i][t] = j;
 
@@ -453,114 +453,125 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
 						temp_i_1[i-I1_STATE_1] = t-1;
 					}
 				}
-      }
-    }
+            }
+        }
 
     /***********************/
     /* Non_coding state    */
     /***********************/
 
-    if (t==0){
+        if (t==0){
     
 		}else{
-      alpha[R_STATE][t] = alpha[R_STATE][t-1] - hmm_ptr->tr_R_R[from][to] - hmm_ptr->tr[TR_RR];
-      path[R_STATE][t] = R_STATE;
+            alpha[R_STATE][t] = alpha[R_STATE][t-1] - hmm_ptr->tr_R_R[from][to] - hmm_ptr->tr[TR_RR];
+            path[R_STATE][t] = R_STATE;
 
-      temp_alpha = alpha[E_STATE][t-1]  - hmm_ptr->tr[TR_ER];
-      if (temp_alpha < alpha[R_STATE][t] ){
+            temp_alpha = alpha[E_STATE][t-1]  - hmm_ptr->tr[TR_ER];
+            if (temp_alpha < alpha[R_STATE][t] ){
 				alpha[R_STATE][t] = temp_alpha;
 				path[R_STATE][t] = E_STATE;
-      }
+            }
 
-      temp_alpha = alpha[E_STATE_1][t-1] - hmm_ptr->tr[TR_ER] ;
-      if (temp_alpha < alpha[R_STATE][t] ){
-        alpha[R_STATE][t] = temp_alpha;
-        path[R_STATE][t] = E_STATE_1;
-      }
-      alpha[R_STATE][t] -= log95;
-    }
+            temp_alpha = alpha[E_STATE_1][t-1] - hmm_ptr->tr[TR_ER] ;
+            if (temp_alpha < alpha[R_STATE][t] ){
+                alpha[R_STATE][t] = temp_alpha;
+                path[R_STATE][t] = E_STATE_1;
+            }
+            alpha[R_STATE][t] -= log95;
+        }
 
     /******************/
     /* END state      */
     /******************/
     if (alpha[E_STATE][t] == 0){ // Check if previously we haven't considered state number t to be a part of stop codon? 
 
-      alpha[E_STATE][t] = max_dbl;
-      path[E_STATE][t] = NOSTATE;
+        alpha[E_STATE][t] = max_dbl;
+        path[E_STATE][t] = NOSTATE;
 
-      if (t < len_seq -2 && (O[t] == 'T'||O[t] == 't')  &&
+        if (t < len_seq -2 && (O[t] == 'T'||O[t] == 't')  &&
 				 (((O[t+1] == 'A'||O[t+1] == 'a') && (O[t+2] == 'A'||O[t+2] =='a')) ||
 					((O[t+1] == 'A'||O[t+1] == 'a') && (O[t+2] == 'G'||O[t+2] =='g')) ||
 					((O[t+1] == 'G'||O[t+1] == 'g') && (O[t+2] == 'A'||O[t+2] =='a')))) {
 
-				alpha[E_STATE][t+2] = max_dbl;
-				/* transition from frame4,frame5,and frame6 */             //Frame numerations here and in the article are different. 
-				temp_alpha = alpha[M6_STATE][t-1] - hmm_ptr->tr[TR_GE];
-				if (temp_alpha < alpha[E_STATE][t+2]){
-					alpha[E_STATE][t+2] = temp_alpha;
-					path[E_STATE][t] = M6_STATE;
-				}
+            alpha[E_STATE][t+2] = max_dbl;
+            /* transition from frame4,frame5,and frame6 */             //Frame numerations here and in the article are different.
+            temp_alpha = alpha[M6_STATE][t-1] - hmm_ptr->tr[TR_GE];
+            if (temp_alpha < alpha[E_STATE][t+2]){
+                alpha[E_STATE][t+2] = temp_alpha;
+                path[E_STATE][t] = M6_STATE;
+            }
 
-				/* transition from frame1,frame2,and frame3 */
-				temp_alpha  = alpha[M3_STATE][t-1] - hmm_ptr->tr[TR_GE];
-				if (temp_alpha < alpha[E_STATE][t+2]){
-					alpha[E_STATE][t+2] = temp_alpha;
-					path[E_STATE][t] = M3_STATE;
-				}
+            /* transition from frame1,frame2,and frame3 */
+            temp_alpha  = alpha[M3_STATE][t-1] - hmm_ptr->tr[TR_GE];
+            if (temp_alpha < alpha[E_STATE][t+2]){
+                alpha[E_STATE][t+2] = temp_alpha;
+                path[E_STATE][t] = M3_STATE;
+            }
 
-				alpha[E_STATE][t] = max_dbl;
-				alpha[E_STATE][t+1] = max_dbl;
-				path[E_STATE][t+1] = E_STATE;
-				path[E_STATE][t+2] = E_STATE;
+            alpha[E_STATE][t] = max_dbl;
+            alpha[E_STATE][t+1] = max_dbl;
+            path[E_STATE][t+1] = E_STATE;
+            path[E_STATE][t+2] = E_STATE;
 
-				alpha[M6_STATE][t+2] = max_dbl;
-				alpha[M5_STATE][t+1] = max_dbl;
-				alpha[M4_STATE][t] = max_dbl;
-				alpha[M3_STATE][t+2] = max_dbl;
-				alpha[M2_STATE][t+1] = max_dbl;
-				alpha[M1_STATE][t] = max_dbl;
+            alpha[M6_STATE][t+2] = max_dbl;
+            alpha[M5_STATE][t+1] = max_dbl;
+            alpha[M4_STATE][t] = max_dbl;
+            alpha[M3_STATE][t+2] = max_dbl;
+            alpha[M2_STATE][t+1] = max_dbl;
+            alpha[M1_STATE][t] = max_dbl;
 
-				if ((O[t+1] == 'A'||O[t+1] =='a') && (O[t+2] == 'A'||O[t+2] =='a')){
-					alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log54;
-				}else if ((O[t+1] == 'A'||O[t+1] =='a') && (O[t+2] == 'G'||O[t+2] =='g')){
-					alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log16;
-				}else if((O[t+1] == 'G'||O[t+1] == 'g') && (O[t+2] == 'A'||O[t+2] =='a')) {
-					alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log30;
-				}
+            if ((O[t+1] == 'A'||O[t+1] =='a') && (O[t+2] == 'A'||O[t+2] =='a')){
+                alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log54;
+            }else if ((O[t+1] == 'A'||O[t+1] =='a') && (O[t+2] == 'G'||O[t+2] =='g')){
+                alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log16;
+            }else if((O[t+1] == 'G'||O[t+1] == 'g') && (O[t+2] == 'A'||O[t+2] =='a')) {
+                alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log30;
+            }
 
-				/* adjustment based on probability distribution */
-				start_freq=0;
-				freq_id = 0;
+            /* adjustment based on probability distribution */
+            start_freq=0;
+            freq_id = 0;
 
-        double sub_sum = 0;
-        int sub_count = 0;
+            double sub_sum = 0;
+            int sub_count = 0;
 
-        if (t>=60){ /* bug reported by Yu-Wei */
-          for(i=-60; i<=-3; i++){
-						if (t+i+2 < len_seq){
-							start_freq -= hmm_ptr->tr_E[i+60][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
-						}
-          }
-        }else{
-          for(i=(-1*t); i<=-3; i++){
-						if (t+i+2 < len_seq){
-							sub_sum += hmm_ptr->tr_E[i+60][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
-						}
-          }
-          sub_sum = sub_sum * 58 / (-3 + t + 1);
-          start_freq -= sub_sum;
+            int lbound = min(t, 60);
+
+            for (i = -lbound; i <= -3; ++i){
+                if (t + i + 2 < len_seq) {
+                    sub_sum += hmm_ptr->tr_E[i+60][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
+                }
+            }
+            sub_sum  *=  58 / (t - 2);
+            start_freq -= sub_sum;
+            /*
+            //original code
+            if (t>=60){ // bug reported by Yu-Wei
+                for(i=-60; i<=-3; i++){
+                    if (t+i+2 < len_seq){
+                        start_freq -= hmm_ptr->tr_E[i+60][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
+                    }
+                }
+            }else{
+                for(i=(-1*t); i<=-3; i++){
+                    if (t+i+2 < len_seq){
+                        sub_sum += hmm_ptr->tr_E[i+60][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
+                    }
+                }
+                sub_sum = sub_sum * 58 / (-3 + t + 1);
+                start_freq -= sub_sum;
+            }
+            */
+            h_kd = hmm_ptr->E_dist[2] * exp(-1*pow(start_freq-hmm_ptr->E_dist[1],2)/(2*pow(hmm_ptr->E_dist[0],2)));
+            r_kd = hmm_ptr->E_dist[5] * exp(-1*pow(start_freq-hmm_ptr->E_dist[4],2)/(2*pow(hmm_ptr->E_dist[3],2)));
+            p_kd = h_kd / (h_kd + r_kd);
+            if (p_kd<0.01){
+                p_kd=0.01;
+            }else if (p_kd>0.99){
+                p_kd=0.99;
+            }
+            alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log(p_kd);
         }
-
-				h_kd = hmm_ptr->E_dist[2] * exp(-1*pow(start_freq-hmm_ptr->E_dist[1],2)/(2*pow(hmm_ptr->E_dist[0],2)));
-				r_kd = hmm_ptr->E_dist[5] * exp(-1*pow(start_freq-hmm_ptr->E_dist[4],2)/(2*pow(hmm_ptr->E_dist[3],2)));
-				p_kd = h_kd / (h_kd + r_kd);
-				if (p_kd<0.01){
-					p_kd=0.01;
-				}else if (p_kd>0.99){
-					p_kd=0.99;
-				}
-				alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log(p_kd);
-      }
     }
 
     /*************************************************/
@@ -569,8 +580,8 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
     /*************************************************/
     if (alpha[S_STATE_1][t] == 0){
 
-      alpha[S_STATE_1][t] = max_dbl;
-      path[S_STATE_1][t] = NOSTATE;
+        alpha[S_STATE_1][t] = max_dbl;
+        path[S_STATE_1][t] = NOSTATE;
 
 
       if (t<len_seq-2 && (O[t+2] == 'A'||O[t+2] == 'a') &&
