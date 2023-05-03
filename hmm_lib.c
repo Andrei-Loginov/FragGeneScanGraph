@@ -729,62 +729,72 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
     /**********************************************/
     if (alpha[E_STATE_1][t] == 0){
 
-      alpha[E_STATE_1][t] = max_dbl;
-      path[E_STATE_1][t] = NOSTATE;
+        alpha[E_STATE_1][t] = max_dbl;
+        path[E_STATE_1][t] = NOSTATE;
 
-      if (t < len_seq - 2 && (O[t] == 'C'||O[t] =='c') && (O[t+1] == 'A'||O[t+1] == 'a') &&
+        if (t < len_seq - 2 && (O[t] == 'C'||O[t] =='c') && (O[t+1] == 'A'||O[t+1] == 'a') &&
 				 ((O[t+2] == 'T'||O[t+2] =='t') || (O[t+2] == 'C'||O[t+2] =='c') || (O[t+2] == 'A'||O[t+2] =='a'))) {
 
-				/* transition from frame6 */
-				alpha[E_STATE_1][t+2] = alpha[M6_STATE_1][t-1] - hmm_ptr->tr[TR_GE];
-				path[E_STATE_1][t] = M6_STATE_1;
-				alpha[E_STATE_1][t] = max_dbl;
-				alpha[E_STATE_1][t+1] = max_dbl;
-				path[E_STATE_1][t+1] = E_STATE_1;
-				path[E_STATE_1][t+2] = E_STATE_1;
+            /* transition from frame6 */
+            alpha[E_STATE_1][t+2] = alpha[M6_STATE_1][t-1] - hmm_ptr->tr[TR_GE];
+            path[E_STATE_1][t] = M6_STATE_1;
+            alpha[E_STATE_1][t] = max_dbl;
+            alpha[E_STATE_1][t+1] = max_dbl;
+            path[E_STATE_1][t+1] = E_STATE_1;
+            path[E_STATE_1][t+2] = E_STATE_1;
 
-				if ((O[t+2] == 'T'||O[t+2] == 't') ){
-					alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log83;
-				}else if ((O[t+2] == 'C'||O[t+2] =='c') ){
-					alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log(0.10);
-				}else if((O[t+2] == 'A'||O[t+2] =='a') ){
-					alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log07;
-				}
+            if ((O[t+2] == 'T'||O[t+2] == 't') ){
+                alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log83;
+            }else if ((O[t+2] == 'C'||O[t+2] =='c') ){
+                alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log(0.10);
+            }else if((O[t+2] == 'A'||O[t+2] =='a') ){
+                alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log07;
+            }
 
-				/* adjustment based on probability distribution */
-				start_freq=0;
-				freq_id = 0;
+            /* adjustment based on probability distribution */
+            start_freq=0;
+            freq_id = 0;
 
-        double sub_sum = 0;
-        int sub_count = 0;
+            double sub_sum = 0;
+            int sub_count = 0;
 
-        if (t>=30){
-					for(i=-30; i<=30; i++){
-						if (t+i+2 < len_seq){	
-							start_freq -= hmm_ptr->tr_E_1[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
-						}
-          }
-        }else{
-          for(i=(-1*t); i<=30; i++){
-						if (t+i+2 < len_seq){	
-							sub_sum += hmm_ptr->tr_E_1[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
-						}
-          }
-          sub_sum = sub_sum * 61 / (30 + t + 1);
-          start_freq -= sub_sum;
+            int lbound = min(t, 30);
+            for (i = -lbound; i <= 30; ++i){
+                if (t+i+2 < len_seq){
+                    sub_sum += hmm_ptr->tr_E_1[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
+                }
+            }
+            sub_sum *= 61.0 / (31 + lbound);
+            start_freq -= sub_sum;
+            /*
+            //original code
+            if (t>=30){
+                for(i=-30; i<=30; i++){
+                    if (t+i+2 < len_seq){
+                        start_freq -= hmm_ptr->tr_E_1[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
+                    }
+                }
+            }else{
+                for(i=(-1*t); i<=30; i++){
+                    if (t+i+2 < len_seq){
+                        sub_sum += hmm_ptr->tr_E_1[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
+                    }
+                }
+                sub_sum = sub_sum * 61 / (30 + t + 1);
+                start_freq -= sub_sum;
+            }
+            */
+            h_kd = hmm_ptr->E1_dist[2] * exp(-1*pow(start_freq-hmm_ptr->E1_dist[1],2)/(2*pow(hmm_ptr->E1_dist[0],2)));
+            r_kd = hmm_ptr->E1_dist[5] * exp(-1*pow(start_freq-hmm_ptr->E1_dist[4],2)/(2*pow(hmm_ptr->E1_dist[3],2)));
+            p_kd = h_kd / (h_kd + r_kd);
+
+            if (p_kd<0.01){
+                p_kd=0.01;
+            }else if (p_kd>0.99){
+                p_kd=0.99;
+            }
+            alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log(p_kd);
         }
-
-				h_kd = hmm_ptr->E1_dist[2] * exp(-1*pow(start_freq-hmm_ptr->E1_dist[1],2)/(2*pow(hmm_ptr->E1_dist[0],2)));
-				r_kd = hmm_ptr->E1_dist[5] * exp(-1*pow(start_freq-hmm_ptr->E1_dist[4],2)/(2*pow(hmm_ptr->E1_dist[3],2)));
-				p_kd = h_kd / (h_kd + r_kd);
-
-				if (p_kd<0.01){
-					p_kd=0.01;
-				}else if (p_kd>0.99){
-					p_kd=0.99;
-				}
-				alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log(p_kd);
-      }
     }
     if (num_N>9){
 			for (i=0; i<NUM_STATE; i++){
