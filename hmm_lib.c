@@ -542,7 +542,7 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
                     sub_sum += hmm_ptr->tr_E[i+60][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
                 }
             }
-            sub_sum  *=  58 / (t - 2);
+            sub_sum  *=  58.0 / (t - 2);
             start_freq -= sub_sum;
             /*
             //original code
@@ -644,73 +644,83 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
     /************************/
     if (alpha[S_STATE][t] == 0){
 
-      alpha[S_STATE][t] = max_dbl;
-      path[S_STATE][t] = NOSTATE;
+        alpha[S_STATE][t] = max_dbl;
+        path[S_STATE][t] = NOSTATE;
 
-      if (t<len_seq-2 &&  (O[t+1] == 'T'||O[t+1] =='t') && (O[t+2] == 'G'||O[t+2] =='g')&&
+        if (t<len_seq-2 &&  (O[t+1] == 'T'||O[t+1] =='t') && (O[t+2] == 'G'||O[t+2] =='g')&&
 					((O[t] == 'A'||O[t] =='a') || (O[t] == 'G'||O[t] =='g') ||  (O[t] == 'T'||O[t] =='t'))) {
 
-				alpha[S_STATE][t] = max_dbl;
-				alpha[S_STATE][t+1] = max_dbl;
-				alpha[S_STATE][t+2] = alpha[R_STATE][t-1] - hmm_ptr->tr[TR_RS];
-				path[S_STATE][t] = R_STATE;
-				path[S_STATE][t+1] = S_STATE;
-				path[S_STATE][t+2] = S_STATE;
+            alpha[S_STATE][t] = max_dbl;
+            alpha[S_STATE][t+1] = max_dbl;
+            alpha[S_STATE][t+2] = alpha[R_STATE][t-1] - hmm_ptr->tr[TR_RS];
+            path[S_STATE][t] = R_STATE;
+            path[S_STATE][t+1] = S_STATE;
+            path[S_STATE][t+2] = S_STATE;
 
-				temp_alpha = alpha[E_STATE][t-1] - hmm_ptr->tr[TR_ES];
-				if (temp_alpha < alpha[S_STATE][t+2]){
-					alpha[S_STATE][t+2] = temp_alpha;
-					path[S_STATE][t] = E_STATE;
-				}
+            temp_alpha = alpha[E_STATE][t-1] - hmm_ptr->tr[TR_ES];
+            if (temp_alpha < alpha[S_STATE][t+2]){
+                alpha[S_STATE][t+2] = temp_alpha;
+                path[S_STATE][t] = E_STATE;
+            }
 
-				temp_alpha = alpha[E_STATE_1][t-1] - hmm_ptr->tr[TR_ES1];
-				if (temp_alpha < alpha[S_STATE][t+2]){
-					alpha[S_STATE][t+2] = temp_alpha;
-					path[S_STATE][t] = E_STATE_1;
-				}
+            temp_alpha = alpha[E_STATE_1][t-1] - hmm_ptr->tr[TR_ES1];
+            if (temp_alpha < alpha[S_STATE][t+2]){
+                alpha[S_STATE][t+2] = temp_alpha;
+                path[S_STATE][t] = E_STATE_1;
+            }
 
 
-				if ((O[t] == 'A'||O[t] =='a') ){
-					alpha[S_STATE][t+2] = alpha[S_STATE][t+2] - log83;
-				}else if ((O[t] == 'G'||O[t] =='g')){
-					alpha[S_STATE][t+2] = alpha[S_STATE][t+2] - log(0.10);
-				}else if((O[t] == 'T'||O[t] == 't')) {
-					alpha[S_STATE][t+2] = alpha[S_STATE][t+2] - log07;
-				}
+            if ((O[t] == 'A'||O[t] =='a') ){
+                alpha[S_STATE][t+2] = alpha[S_STATE][t+2] - log83;
+            }else if ((O[t] == 'G'||O[t] =='g')){
+                alpha[S_STATE][t+2] = alpha[S_STATE][t+2] - log(0.10);
+            }else if((O[t] == 'T'||O[t] == 't')) {
+                alpha[S_STATE][t+2] = alpha[S_STATE][t+2] - log07;
+            }
 
-				/* adjustment based on probability distribution */
-				start_freq=0;
-				freq_id = 0;
-        double sub_sum = 0;
-        int sub_count = 0;
+            /* adjustment based on probability distribution */
+            start_freq=0;
+            freq_id = 0;
+            double sub_sum = 0;
+            int sub_count = 0;
 
-        if (t>=30){
-          for(i=-30; i<=30; i++){
-						if (t+i+2 < len_seq){	
-							start_freq -= hmm_ptr->tr_S[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
-						}
-          }
-        }else{
-          for(i=(-1*t); i<=30; i++){
-						if (t+i+2 < len_seq){	
-							sub_sum += hmm_ptr->tr_S[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
-						}
-          }
-          sub_sum = sub_sum * 61 / (30 + t + 1);
-          start_freq -= sub_sum;
+            int lbound = min(30, t);
+
+            for (i = -lbound; i <= 30; ++i){
+                if (t + i + 2 < len_seq)
+                    sub_sum += hmm_ptr->tr_S[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
+            }
+            sub_sum *= 61.0 / (30 + lbound + 1);
+            start_freq -= sub_sum;
+            /*
+            //orifginal code
+            if (t>=30){
+                for(i=-30; i<=30; i++){
+                    if (t+i+2 < len_seq){
+                        start_freq -= hmm_ptr->tr_S[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
+                    }
+                }
+            }else{
+                for(i=(-1*t); i<=30; i++){
+                    if (t+i+2 < len_seq){
+                        sub_sum += hmm_ptr->tr_S[i+30][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
+                    }
+                }
+                sub_sum = sub_sum * 61 / (30 + t + 1);
+                start_freq -= sub_sum;
+            }
+            */
+            h_kd = hmm_ptr->S_dist[2] * exp(-1*pow(start_freq-hmm_ptr->S_dist[1],2)/(2*pow(hmm_ptr->S_dist[0],2)));
+            r_kd = hmm_ptr->S_dist[5] * exp(-1*pow(start_freq-hmm_ptr->S_dist[4],2)/(2*pow(hmm_ptr->S_dist[3],2)));
+            p_kd = h_kd / (h_kd + r_kd);
+            if (p_kd<0.01){
+                p_kd=0.01;
+            }else if (p_kd>0.99){
+                p_kd=0.99;
+            }
+            alpha[S_STATE][t+2] = alpha[S_STATE][t+2] - log(p_kd);
+
         }
-
-				h_kd = hmm_ptr->S_dist[2] * exp(-1*pow(start_freq-hmm_ptr->S_dist[1],2)/(2*pow(hmm_ptr->S_dist[0],2)));
-				r_kd = hmm_ptr->S_dist[5] * exp(-1*pow(start_freq-hmm_ptr->S_dist[4],2)/(2*pow(hmm_ptr->S_dist[3],2)));
-				p_kd = h_kd / (h_kd + r_kd);
-				if (p_kd<0.01){
-					p_kd=0.01;
-				}else if (p_kd>0.99){
-					p_kd=0.99;
-				}
-				alpha[S_STATE][t+2] = alpha[S_STATE][t+2] - log(p_kd);
-
-      }
     }
 
     /**********************************************/
