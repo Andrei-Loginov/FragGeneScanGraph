@@ -763,18 +763,17 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
 					p_kd=0.99;
 				}
 				alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log(p_kd);
-        }
+      }
     }
-        if (num_N>9){
+    if (num_N>9){
 			for (i=0; i<NUM_STATE; i++){
 				if (i!=R_STATE){
 					alpha[i][t] = max_dbl;
 					path[i][t] = R_STATE;
 				}
-            }
-        }
+      }
     }
-
+  }
 #ifdef viterbi_out_flg
     printf("The Viterbi matrix was evaluated\n");
     char *fname = "../run_result/viterbi_matrix.csv";
@@ -790,19 +789,18 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
   /* backtrack array to find the optimal path                */
   /***********************************************************/
 
-    head_short = strtok(head, delimi);
-    fprintf(fp_out, "%s\n", head_short); //use head_short, Ye, April 22, 2016
+  head_short = strtok(head, delimi);
+  fprintf(fp_out, "%s\n", head_short); //use head_short, Ye, April 22, 2016
 
   /* find the state for O[N] with the highest probability */
-    prob = max_dbl;
-    for (i = 0; i < hmm_ptr->N; i++){
+  prob = max_dbl;
+  for (i = 0; i < hmm_ptr->N; i++){
 
-        if (alpha[i][len_seq-1] < prob){
-            prob = alpha[i][len_seq-1];
-            vpath[len_seq-1] = i;
-        }
+    if (alpha[i][len_seq-1] < prob){
+      prob = alpha[i][len_seq-1];
+      vpath[len_seq-1] = i;
     }
-
+  }
 
   /* backtrack the optimal path */
   for(t=len_seq-2; t>=0; t--){

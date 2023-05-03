@@ -385,3 +385,11 @@ void print_viterbi(double **matr, int len_seq, int n_state, FILE *f){
         fprintf(f,"\n");
     }
 }
+
+int min(int lhs, int rhs) {
+    return (lhs < rhs) ? lhs : rhs;
+}
+
+int max(int lhs, int rhs) {
+    return (lhs > rhs) ? lhs : rhs;
+}
