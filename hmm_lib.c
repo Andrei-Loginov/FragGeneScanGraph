@@ -7,7 +7,7 @@
 #include <ctype.h>
 #include "hmm.h"
 #include "util_lib.h"
-#define viterbi_out_flg
+//#define viterbi_out_flg
 
 void dump_memory(void *p, int size);
 
@@ -1115,45 +1115,37 @@ vpath[temp_t] != M1_STATE_1  && vpath[temp_t] != M4_STATE_1){
 }
 
 int get_prob_from_cg(HMM *hmm_ptr, TRAIN *train_ptr, char *O){ //change from void to int, Ye, April 18, 2016
-  int cg_id = -1;
-  int cg_count=0;
-  int len_seq;
-  int i,j,k;
+    int cg_id = -1;
+    int cg_count=0;
+    int len_seq;
+    int i,j,k;
 
-  len_seq = strlen(O);
-  for (i=0; i<len_seq; i++){
-    if ((O[i] == 'C'||O[i] =='c') || (O[i] == 'G'||O[i] == 'g') ){
-      cg_count++;
+    len_seq = strlen(O);
+    for (i=0; i<len_seq; i++){
+        if ((O[i] == 'C'||O[i] =='c') || (O[i] == 'G'||O[i] == 'g') ){
+            ++cg_count;
+        }
     }
-  }
-   cg_count = floor((cg_count*1.0/len_seq)*100)-26;
-   if (cg_count < 0){
-     cg_count = 0;
-   }else if (cg_count > 43){
-     cg_count = 43;
-   }
+    cg_count = floor((cg_count*1.0/len_seq)*100)-26;
+    if (cg_count < 0){
+        cg_count = 0;
+    }else if (cg_count > 43){
+        cg_count = 43;
+    }
 
-  memcpy(hmm_ptr->e_M, train_ptr->trans[cg_count], sizeof(hmm_ptr->e_M));
-  memcpy(hmm_ptr->e_M_1, train_ptr->rtrans[cg_count],
-sizeof(hmm_ptr->e_M_1));
-  memcpy(hmm_ptr->tr_R_R, train_ptr->noncoding[cg_count],
-sizeof(hmm_ptr->tr_R_R));
-  memcpy(hmm_ptr->tr_S, train_ptr->start[cg_count], sizeof(hmm_ptr->tr_S));
-  memcpy(hmm_ptr->tr_E, train_ptr->stop[cg_count], sizeof(hmm_ptr->tr_E));
-  memcpy(hmm_ptr->tr_S_1, train_ptr->start1[cg_count],
-sizeof(hmm_ptr->tr_S_1));
-  memcpy(hmm_ptr->tr_E_1, train_ptr->stop1[cg_count],
-sizeof(hmm_ptr->tr_E_1));
-  memcpy(hmm_ptr->S_dist, train_ptr->S_dist[cg_count],
-sizeof(hmm_ptr->S_dist));
-  memcpy(hmm_ptr->E_dist, train_ptr->E_dist[cg_count],
-sizeof(hmm_ptr->E_dist));
-  memcpy(hmm_ptr->S1_dist, train_ptr->S1_dist[cg_count],
-sizeof(hmm_ptr->S1_dist));
-  memcpy(hmm_ptr->E1_dist, train_ptr->E1_dist[cg_count],
-sizeof(hmm_ptr->E1_dist));
- 
-  return cg_count;
+    memcpy(hmm_ptr->e_M, train_ptr->trans[cg_count], sizeof(hmm_ptr->e_M));
+    memcpy(hmm_ptr->e_M_1, train_ptr->rtrans[cg_count], sizeof(hmm_ptr->e_M_1));
+    memcpy(hmm_ptr->tr_R_R, train_ptr->noncoding[cg_count], sizeof(hmm_ptr->tr_R_R));
+    memcpy(hmm_ptr->tr_S, train_ptr->start[cg_count], sizeof(hmm_ptr->tr_S));
+    memcpy(hmm_ptr->tr_E, train_ptr->stop[cg_count], sizeof(hmm_ptr->tr_E));
+    memcpy(hmm_ptr->tr_S_1, train_ptr->start1[cg_count], sizeof(hmm_ptr->tr_S_1));
+    memcpy(hmm_ptr->tr_E_1, train_ptr->stop1[cg_count], sizeof(hmm_ptr->tr_E_1));
+    memcpy(hmm_ptr->S_dist, train_ptr->S_dist[cg_count], sizeof(hmm_ptr->S_dist));
+    memcpy(hmm_ptr->E_dist, train_ptr->E_dist[cg_count], sizeof(hmm_ptr->E_dist));
+    memcpy(hmm_ptr->S1_dist, train_ptr->S1_dist[cg_count], sizeof(hmm_ptr->S1_dist));
+    memcpy(hmm_ptr->E1_dist, train_ptr->E1_dist[cg_count], sizeof(hmm_ptr->E1_dist));
+
+    return cg_count;
 }
 
 
