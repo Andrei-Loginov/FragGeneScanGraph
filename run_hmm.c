@@ -217,7 +217,10 @@ int main (int argc, char **argv)
         if (tmp_str[0] == '>'){
             strcpy(td.obs_head, tmp_str);
         } else {
-            strcat(td.obs_seq, tmp_str);
+            for (i = 0; i < strlen(tmp_str); ++i)
+                if (!isalpha(tmp_str[i]))
+                    tmp_str[i] = '\0';
+            strcat(td.obs_seq, tmp_str);   
         }
     }
 
