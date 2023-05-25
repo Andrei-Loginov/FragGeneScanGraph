@@ -7,7 +7,7 @@
 #include <ctype.h>
 #include "hmm.h"
 #include "util_lib.h"
-//#define viterbi_out_flg
+#define viterbi_out_flg
 
 void dump_memory(void *p, int size);
 
@@ -959,9 +959,8 @@ vpath[temp_t] != M1_STATE_1  && vpath[temp_t] != M4_STATE_1){
 	      dna[end_t - start_t + 1] = 0;
             }
  	  }
-	  fprintf(fp_out, "%d\t%d\t+\t%d\t%lf\t", start_t, end_t, frame, final_score);
-
-	  fprintf(fp_out, "I:");
+        fprintf(fp_out, "%d\t%d\t+\t%d\t%lf\t", start_t, end_t, frame, final_score);
+        fprintf(fp_out, "I:");
 	  for (i=0; i<insert_id; i++){
 	    fprintf(fp_out, "%d,", insert[i]);
 	  }
@@ -1108,7 +1107,9 @@ vpath[temp_t] != M1_STATE_1  && vpath[temp_t] != M4_STATE_1){
 
     }
   }
-
+#ifdef viterbi_out_flg
+    printf("End of viterbi\n");
+#endif
   free_dmatrix(alpha, hmm_ptr->N);
   free_imatrix(path, hmm_ptr->N);
   free_ivector(vpath);
