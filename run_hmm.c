@@ -60,7 +60,7 @@ int main (int argc, char **argv)
     char tmp_str[STRINGLEN] = "";
     int *obs_seq_len;
     int bp_count;  /* count the length of each line in input file */
-
+    int head_len;
     int threadnum = 1;
     int rc;
 
@@ -199,113 +199,41 @@ int main (int argc, char **argv)
     td.wholegenome = wholegenome;
     td.format = format;
 
-    pthread_t *thread;
-    //thread = (pthread_t*)malloc(sizeof(thread) * threadnum);
-    //memset(thread, '\0', sizeof(thread) * threadnum);
-    void *status;
-    fp = fopen (seq_file, "r");
-    while ( fgets (tmp_str , sizeof tmp_str , fp) ){
+    fp = fopen(seq_file, "r");
+    bp_count = 0;
+    while (fgets(tmp_str, sizeof(tmp_str), fp)){
         if (tmp_str[0] == '>'){
-        count++;
+            head_len = strlen(tmp_str);
+        } else {
+            bp_count += strlen(tmp_str);
         }
     }
-    obs_seq_len = (int *)malloc(count * sizeof(int));
-    printf("no. of seqs: %d\n", count);
-
-    i = 0;
-    count = 0;
-    rewind(fp);
-    while ( fgets (tmp_str , sizeof tmp_str , fp) ){
-        if (tmp_str[0] == '>'){
-            if (i>0){
-                obs_seq_len[count] = i;
-                count++;
-            }
-            i = 0;
-        }else{
-            bp_count = strlen(tmp_str);
-            while(tmp_str[bp_count-1] == 10 || tmp_str[bp_count-1]==13){
-                bp_count --;
-            }
-
-            i += bp_count;
-        }
-    }
-    obs_seq_len[count] = i;
+    ++bp_count;
+    td.obs_seq = (char*)malloc(bp_count * sizeof(char));
+    td.obs_head = (char*)malloc(head_len);
 
     rewind(fp);
-    total = 0;
-    count = 0;
-    j = 0;
-
-    while (!(feof(fp))){
-        memset(tmp_str, '\0', sizeof tmp_str);
-        fgets (tmp_str , sizeof tmp_str  , fp);
-        bp_count = strlen(tmp_str);
-        while(tmp_str[bp_count - 1] == 10 || tmp_str[bp_count - 1]==13){
-            //tmp_str[bp_count - 1] = 0;
-            bp_count --;
+    while (fgets(tmp_str, sizeof(tmp_str), fp)){
+        if (tmp_str[0] == '>'){
+            strcpy(td.obs_head, tmp_str);
+        } else {
+            strcat(td.obs_seq, tmp_str);
         }
-
-        if (tmp_str[0] == '>' || feof(fp)){
-            if (feof(fp)){
-                memcpy(threadarr[currcount].obs_seq + j, tmp_str, bp_count);
-                j += bp_count;
-                //max = appendSeq(tmp_str, &(threadarr[currcount].obs_seq), max);
-            }
-            if ((count > 0 && count % threadnum == 0) || feof(fp)){
-                // Deal with the thread
-                for (i = 0; i < count; i++){
-                    rc = pthread_create(&thread[i], NULL, thread_func, (void*)&threadarr[i]);
-                    if (rc){
-                        printf("Error: Unable to create thread, %d\n", rc);
-                        exit(-1);
-                    }
-                }
-                for (i = 0; i < count; i++){
-                    rc = pthread_join(thread[i], &status);
-                    if (rc){
-                        printf("Error: Unable to join threads, %d\n", rc);
-                        exit(-1);
-                    }
-                }
-                for (i = 0; i < count; i++){
-                    free(threadarr[i].obs_head);
-                    free(threadarr[i].obs_seq);
-                    threadarr[i].obs_head = NULL;
-                    threadarr[i].obs_seq = NULL;
-                }
-
-                count = 0;
-            }
-
-            if (!(feof(fp)))
-            {
-                threadarr[count].obs_head = (char *)malloc((bp_count+1) * sizeof(char));
-                memset(threadarr[count].obs_head, 0, (bp_count+1) * sizeof(char));
-                memcpy(threadarr[count].obs_head, tmp_str, bp_count);
-                //threadarr[count].obs_seq = NULL;
-                threadarr[count].obs_seq = (char*)malloc((obs_seq_len[total] + 1) * sizeof(char));
-                memset(threadarr[count].obs_seq, '\0', (obs_seq_len[total] + 1) * sizeof(char));
-                total++;
-                currcount = count;
-                count++;
-                j = 0;
-                max = 0;
-            }
-
-            }else{
-                memcpy(threadarr[currcount].obs_seq + j, tmp_str, bp_count);
-                j += bp_count;
-                //max = appendSeq(tmp_str, &(threadarr[currcount].obs_seq), max);
-            }
-            if (feof(fp))
-            {
-                break;
-            }
     }
 
+    td.cg = get_prob_from_cg(td.hmm, td.train, td.obs_seq);
+    printf("%s\n%s\n", td.obs_head, td.obs_seq);
+    if (strlen(td.obs_seq) > 70) {
+        viterbi(td.hmm, td.train, td.obs_seq, td.out, td.aa, td.dna, td.obs_head, td.wholegenome, td.cg, td.format);
+    }
 
+    free(td.obs_seq);
+    free(td.obs_head);
+
+    fclose(fp);
+    fclose(fp_out);
+    fclose(fp_aa);
+    fclose(fp_dna);
     clock_t end = clock();
     printf("Clock time used (by %d threads) = %.2f mins\n", threadnum, (end - start) / (60.0 * CLOCKS_PER_SEC));
 }
