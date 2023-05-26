@@ -820,176 +820,186 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
   /* backtrack array to find the optimal path                */
   /***********************************************************/
 
-  head_short = strtok(head, delimi);
-  fprintf(fp_out, "%s\n", head_short); //use head_short, Ye, April 22, 2016
+    head_short = strtok(head, delimi);
+    fprintf(fp_out, "%s\n", head_short); //use head_short, Ye, April 22, 2016
 
-  /* find the state for O[N] with the highest probability */
-  prob = max_dbl;
-  for (i = 0; i < hmm_ptr->N; i++){
+    /* find the state for O[N] with the highest probability */
+    prob = max_dbl;
+    for (i = 0; i < hmm_ptr->N; i++){
 
-    if (alpha[i][len_seq-1] < prob){
-      prob = alpha[i][len_seq-1];
-      vpath[len_seq-1] = i;
+        if (alpha[i][len_seq-1] < prob){
+            prob = alpha[i][len_seq-1];
+            vpath[len_seq-1] = i;
+        }
     }
-  }
-
+#ifdef viterbi_out_flg
+    printf("The max prob is %lf\n", prob);
+    //fprintf(fp_out, "Before backtracking\n");
+#endif
   /* backtrack the optimal path */
-  for(t=len_seq-2; t>=0; t--){
-    vpath[t] = path[vpath[t+1]][t+1];
-  }
-
-  print_save = 0;
-  codon_start=0;
-  start_t=-1;
-
-  int glen = strlen(O);
-  char codon[4], utr[65];
-  for (t=0; t<len_seq; t++){
-
-    if (codon_start==0 && start_t < 0 &&
-	((vpath[t]>=M1_STATE && vpath[t]<=M6_STATE) ||
-	 (vpath[t]>=M1_STATE_1 && vpath[t]<=M6_STATE_1) ||
-	 vpath[t] == S_STATE || vpath[t] == S_STATE_1 )){
-      start_t=t+1;
-      //printf("Note assign start_t %d (t=%d vpath %d)\n", start_t, t, vpath[t]);
+    for(t=len_seq-2; t>=0; t--){
+        vpath[t] = path[vpath[t+1]][t+1];
     }
 
-    if (codon_start==0 &&
-	(vpath[t]==M1_STATE || vpath[t]==M4_STATE ||
-	 vpath[t]==M1_STATE_1 || vpath[t]==M4_STATE_1)){
+    print_save = 0;
+    codon_start=0;
+    start_t=-1;
 
-      memset(dna,0,300000);
-      memset(dna1,0,300000);
-      memset(dna_f,0,300000);
-      memset(dna_f1,0,300000);
-      memset(protein,0, 100000);
-      memset(insert,0,100);
-      memset(delete,0,100);
+    int glen = strlen(O);
+    char codon[4], utr[65];
+    for (t=0; t<len_seq; t++){
 
-      insert_id = 0;
-      delete_id = 0;
-      dna_id = 0;
-      dna_f_id = 0;
-      dna[dna_id]=O[t];
-      dna_start_t = t + 1; //Ye April 21, 2016
-      dna_f[dna_f_id]=O[t];
-      //printf("Note start dna: t = %d, dna_id %d, dna_f_id %d, add %c\n", t, dna_id, dna_f_id, O[t]);
-      start_orf=t+1;
-      prev_match = vpath[t];
+        if (codon_start==0 && start_t < 0 &&
+           ((vpath[t]>=M1_STATE && vpath[t]<=M6_STATE) ||
+           (vpath[t]>=M1_STATE_1 && vpath[t]<=M6_STATE_1) ||
+           vpath[t] == S_STATE || vpath[t] == S_STATE_1 ))
+        {
+            start_t=t+1;
+            //printf("Note assign start_t %d (t=%d vpath %d)\n", start_t, t, vpath[t]);
+        }
 
-      if (vpath[t] < M6_STATE){
-	codon_start=1;
-      }else{
-	codon_start=-1;
-      }
+        if (codon_start==0 &&
+           (vpath[t]==M1_STATE || vpath[t]==M4_STATE ||
+           vpath[t]==M1_STATE_1 || vpath[t]==M4_STATE_1)){
 
-    }else if (codon_start!=0 && (vpath[t]==E_STATE || vpath[t]==E_STATE_1 || t==len_seq-1)){
+            memset(dna,0,300000);
+            memset(dna1,0,300000);
+            memset(dna_f,0,300000);
+            memset(dna_f1,0,300000);
+            memset(protein,0, 100000);
+            memset(insert,0,100);
+            memset(delete,0,100);
 
-      if (vpath[t]==E_STATE || vpath[t]==E_STATE_1){
-	end_t=t+3;
-      }else{
-	end_t=t+1;
+            insert_id = 0;
+            delete_id = 0;
+            dna_id = 0;
+            dna_f_id = 0;
+            dna[dna_id]=O[t];
+            dna_start_t = t + 1; //Ye April 21, 2016
+            dna_f[dna_f_id]=O[t];
+            //printf("Note start dna: t = %d, dna_id %d, dna_f_id %d, add %c\n", t, dna_id, dna_f_id, O[t]);
+            start_orf=t+1;
+            prev_match = vpath[t];
 
-	/* FGS1.12 start: remove incomplete codon */
-	temp_t = t;
-	while(vpath[temp_t] != M1_STATE && vpath[temp_t] != M4_STATE  &&
-vpath[temp_t] != M1_STATE_1  && vpath[temp_t] != M4_STATE_1){
-	  dna_f[dna_f_id] = '\0';
-	  dna_f_id--;
-
-	  dna[dna_id] = '\0';
-	  dna_id--;
-
-	  temp_t--;
-	}
-	/* FGS1.12 end: remove incomplete codon */
-      }
-      final_score = (alpha[vpath[end_t-4]][end_t-4]- alpha[vpath[start_t+2]][start_t+2] )/(end_t-start_t-5);
-      frame = start_orf%3;
-      if (frame==0){
-	frame=3;
-      }
-
-      if (dna_id > gene_len  ){
-	if (codon_start==1){
-          if(start_t == dna_start_t - 3) { //add complete start codon to dna, Ye April 21, 2016
-		strcpy(dna_tmp, dna);
-		sprintf(dna, "%c%c%c%s", O[start_t-1], O[start_t], O[start_t+1], dna_tmp);
-		//printf("add start codon to dna: %c%c%c\n", O[start_t-1], O[start_t], O[start_t+1]);
-		//printf("old dna %d %s\n", strlen(dna_tmp), dna_tmp);
-		//printf("new dna %d %s\n", strlen(dna), dna);
-	  }
-	  if(refine) { //add refinement of the start codons here, Ye, April 16, 2016
-  	    int start_old = start_t;
-	    codon[0] = 0;
-            strncpy(codon, O + start_old-1, 3);
-	    codon[3] = 0;
-	    int s = 0;
-	    //find the optimal start codon within 30bp up- and downstream of start codon
-	    double e_save;
-            int s_save;
-	    while((!(!strcmp(codon, "TAA") || !strcmp(codon, "TAG") || !strcmp(codon, "TGA"))) && (start_old-1-s-35>=0)) {
-	      if(!strcmp(codon, "ATG") || !strcmp(codon, "GTG") || !strcmp(codon, "TTG")) {
-		utr[0] = 0;
-		strncpy(utr, O+start_old-1-s-30,63);
-		utr[63] = 0;
-		//printf("check s=%d, codon %s\n", s, codon);
-		double freq_sum = 0;
-		for(j = 0; j < strlen(utr) - 2; j ++) {
-		   int idx = trinucleotide(utr[j], utr[j+1], utr[j+2]); 
-		   freq_sum -= train_ptr->start[cg][j][idx];
-		   //printf("j=%d, key=%c%c%c %d, start %lf\n", j, utr[j], utr[j+1], utr[j+2], idx, train_ptr->start[cg][j][idx]);
-		}
-		if(s == 0) { e_save = freq_sum; s_save = s; }
-		else if(freq_sum < e_save) { e_save = freq_sum; s_save = -1 * s; }
-		//printf("s=%d freq_sum %lf\n", s, freq_sum);
-		//getchar();
-	      }
-	      s += 3;
-	      codon[0] = 0;
-	      strncpy(codon, O+start_old-1-s, 3);
-	      codon[3] = 0;
-	    }
-	    start_t = start_old+s_save;
-	    //update dna
-	    if(s_save != 0) {
-              //printf("start refined + %d -> %d\n", start_old, start_t);
-  	      dna[0] = 0;
-	      strncpy(dna, O + start_t - 1, end_t - start_t + 1);
-	      dna[end_t - start_t + 1] = 0;
+            if (vpath[t] < M6_STATE){
+                codon_start=1;
+            }else{
+                codon_start=-1;
             }
- 	  }
-        fprintf(fp_out, "%d\t%d\t+\t%d\t%lf\t", start_t, end_t, frame, final_score);
-        fprintf(fp_out, "I:");
-	  for (i=0; i<insert_id; i++){
-	    fprintf(fp_out, "%d,", insert[i]);
-	  }
-	  fprintf(fp_out, "\tD:");
-	  for (i=0; i<delete_id; i++){
-	    fprintf(fp_out, "%d,", delete[i]);
-	  }
-	  fprintf(fp_out, "\n");
 
-	  fprintf(fp_aa, "%s_%d_%d_+\n", head_short, start_t, end_t);
-	  fprintf(fp_dna, "%s_%d_%d_+\n", head_short, start_t, end_t);
+        }else if (codon_start!=0 && (vpath[t]==E_STATE || vpath[t]==E_STATE_1 || t==len_seq-1)){
 
-	  //printf("dna-start %c%c%c exp %c%c%c (%c%c%c)\n", dna[0], dna[1], dna[2], O[start_t-1], O[start_t], O[start_t+1], O[start_t+2], O[start_t+3], O[start_t+4]);
-	  //printf("dna-len %d start_t %d end_t %d exp-len %d diff %d\n", strlen(dna), start_t, end_t, end_t - start_t + 1, end_t - start_t + 1 - strlen(dna));
-	  get_protein(dna,protein,1, whole_genome);
-	  fprintf(fp_aa, "%s\n", protein);
-	  if (format==0){
-	    fprintf(fp_dna, "%s\n", dna);
-	  }else if (format==1){
-	    fprintf(fp_dna, "%s\n", dna_f);
-	  }
-	}else if (codon_start==-1){
-          //printf("reverse strand dna-len %d, start_t %d, dna_start %d, add-up %d, end_t %d\n", strlen(dna), start_t, dna_start_t, dna_start_t + strlen(dna), end_t);
-	  //getchar();
-          if(dna_start_t + strlen(dna) == end_t - 2) { //add complete start codon (on reverse strand) to dna, Ye April 21, 2016
-		strcpy(dna_tmp, dna);
-		sprintf(dna, "%s%c%c%c", dna_tmp, O[end_t-3], O[end_t-2], O[end_t-1]);
-		//printf("add start codon on the reverse strand to dna: %c%c%c\n", O[end_t-3], O[end_t-2], O[end_t-1]);
-	  }
+            if (vpath[t]==E_STATE || vpath[t]==E_STATE_1){
+                end_t=t+3;
+            }else{
+                end_t=t+1;
+
+                /* FGS1.12 start: remove incomplete codon */
+                temp_t = t;
+                while(vpath[temp_t] != M1_STATE && vpath[temp_t] != M4_STATE  &&
+                        vpath[temp_t] != M1_STATE_1  && vpath[temp_t] != M4_STATE_1){
+                    dna_f[dna_f_id] = '\0';
+                    dna_f_id--;
+
+                    dna[dna_id] = '\0';
+                    dna_id--;
+
+                    temp_t--;
+                }
+	/* FGS1.12 end: remove incomplete codon */
+            }
+            final_score = (alpha[vpath[end_t-4]][end_t-4]- alpha[vpath[start_t+2]][start_t+2] )/(end_t-start_t-5);
+            frame = start_orf%3;
+            if (frame==0){
+                frame=3;
+            }
+
+            if (dna_id > gene_len  ){
+                if (codon_start==1){
+                    if(start_t == dna_start_t - 3) { //add complete start codon to dna, Ye April 21, 2016
+                        strcpy(dna_tmp, dna);
+                        sprintf(dna, "%c%c%c%s", O[start_t-1], O[start_t], O[start_t+1], dna_tmp);
+                        //printf("add start codon to dna: %c%c%c\n", O[start_t-1], O[start_t], O[start_t+1]);
+                        //printf("old dna %d %s\n", strlen(dna_tmp), dna_tmp);
+                        //printf("new dna %d %s\n", strlen(dna), dna);
+                    }
+                    if(refine) { //add refinement of the start codons here, Ye, April 16, 2016
+                        int start_old = start_t;
+                        codon[0] = 0;
+                        strncpy(codon, O + start_old-1, 3);
+                        codon[3] = 0;
+                        int s = 0;
+                        //find the optimal start codon within 30bp up- and downstream of start codon
+                        double e_save;
+                        int s_save;
+                        while((!(!strcmp(codon, "TAA") || !strcmp(codon, "TAG") || !strcmp(codon, "TGA"))) && (start_old-1-s-35>=0)) {
+                            if(!strcmp(codon, "ATG") || !strcmp(codon, "GTG") || !strcmp(codon, "TTG")) {
+                                utr[0] = 0;
+                                strncpy(utr, O+start_old-1-s-30,63);
+                                utr[63] = 0;
+                                //printf("check s=%d, codon %s\n", s, codon);
+                                double freq_sum = 0;
+                                for(j = 0; j < strlen(utr) - 2; j ++) {
+                                    int idx = trinucleotide(utr[j], utr[j+1], utr[j+2]);
+                                    freq_sum -= train_ptr->start[cg][j][idx];
+                                    //printf("j=%d, key=%c%c%c %d, start %lf\n", j, utr[j], utr[j+1], utr[j+2], idx, train_ptr->start[cg][j][idx]);
+                                }
+                                if(s == 0) {
+                                    e_save = freq_sum;
+                                    s_save = s;
+                                }
+                                else if(freq_sum < e_save) {
+                                    e_save = freq_sum;
+                                    s_save = -1 * s;
+                                }
+                                //printf("s=%d freq_sum %lf\n", s, freq_sum);
+                                //getchar();
+                            }
+                            s += 3;
+                            codon[0] = 0;
+                            strncpy(codon, O+start_old-1-s, 3);
+                            codon[3] = 0;
+                        }
+                        start_t = start_old+s_save;
+                        //update dna
+                        if(s_save != 0) {
+                            //printf("start refined + %d -> %d\n", start_old, start_t);
+                            dna[0] = 0;
+                            strncpy(dna, O + start_t - 1, end_t - start_t + 1);
+                            dna[end_t - start_t + 1] = 0;
+                        }
+                    }
+                    fprintf(fp_out, "%d\t%d\t+\t%d\t%lf\t", start_t, end_t, frame, final_score);
+                    fprintf(fp_out, "I:");
+                    for (i=0; i<insert_id; i++){
+                        fprintf(fp_out, "%d,", insert[i]);
+                    }
+                    fprintf(fp_out, "\tD:");
+                    for (i=0; i<delete_id; i++){
+                        fprintf(fp_out, "%d,", delete[i]);
+                    }
+                    fprintf(fp_out, "\n");
+
+                    fprintf(fp_aa, "%s_%d_%d_+\n", head_short, start_t, end_t);
+                    fprintf(fp_dna, "%s_%d_%d_+\n", head_short, start_t, end_t);
+
+                    //printf("dna-start %c%c%c exp %c%c%c (%c%c%c)\n", dna[0], dna[1], dna[2], O[start_t-1], O[start_t], O[start_t+1], O[start_t+2], O[start_t+3], O[start_t+4]);
+                    //printf("dna-len %d start_t %d end_t %d exp-len %d diff %d\n", strlen(dna), start_t, end_t, end_t - start_t + 1, end_t - start_t + 1 - strlen(dna));
+                    get_protein(dna,protein,1, whole_genome);
+                    fprintf(fp_aa, "%s\n", protein);
+                    if (format==0){
+                        fprintf(fp_dna, "%s\n", dna);
+                    }else if (format==1){
+                        fprintf(fp_dna, "%s\n", dna_f);
+                    }
+                } else if (codon_start==-1){
+                    //printf("reverse strand dna-len %d, start_t %d, dna_start %d, add-up %d, end_t %d\n", strlen(dna), start_t, dna_start_t, dna_start_t + strlen(dna), end_t);
+                    //getchar();
+                    if(dna_start_t + strlen(dna) == end_t - 2) { //add complete start codon (on reverse strand) to dna, Ye April 21, 2016
+                        strcpy(dna_tmp, dna);
+                        sprintf(dna, "%s%c%c%c", dna_tmp, O[end_t-3], O[end_t-2], O[end_t-1]);
+                        //printf("add start codon on the reverse strand to dna: %c%c%c\n", O[end_t-3], O[end_t-2], O[end_t-1]);
+                    }
 	  if(refine) { //add refinement of the start codons here, Ye, April 16, 2016
   	    int end_old = end_t; //reverse
 	    codon[0] = 0;

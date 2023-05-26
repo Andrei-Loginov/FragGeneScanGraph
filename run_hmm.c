@@ -225,9 +225,9 @@ int main (int argc, char **argv)
     }
 
     td.cg = get_prob_from_cg(td.hmm, td.train, td.obs_seq);
-    printf("%s\n%s\n", td.obs_head, td.obs_seq);
+    //printf("%s\n%s\n", td.obs_head, td.obs_seq);
     if (strlen(td.obs_seq) > 70) {
-        printf("%s\n%s\nWholegenome: %d\nCg: %d\nFormat:%d\n", td.obs_head, td.obs_seq, td.wholegenome, td.cg, td.format);
+        //printf("%s\n%s\nWholegenome: %d\nCg: %d\nFormat:%d\n", td.obs_head, td.obs_seq, td.wholegenome, td.cg, td.format);
         viterbi(td.hmm, td.train, td.obs_seq, td.out, td.aa, td.dna, td.obs_head, td.wholegenome, td.cg, td.format);
     }
 
@@ -235,9 +235,9 @@ int main (int argc, char **argv)
     free(td.obs_head);
 
     fclose(fp);
-    fclose(fp_out);
-    fclose(fp_aa);
-    fclose(fp_dna);
+    fclose(td.out);
+    fclose(td.aa);
+    fclose(td.dna);
     clock_t end = clock();
     printf("Clock time used (by %d threads) = %.2f mins\n", threadnum, (end - start) / (60.0 * CLOCKS_PER_SEC));
 }
