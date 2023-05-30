@@ -24,6 +24,8 @@ typedef struct thread_data
     int format;
     HMM *hmm;
     TRAIN *train;
+    double **alpha;
+    int **path;
 } thread_data;
 
 void* thread_func(void *threadarr);
@@ -228,7 +230,8 @@ int main (int argc, char **argv)
     //printf("%s\n%s\n", td.obs_head, td.obs_seq);
     if (strlen(td.obs_seq) > 70) {
         //printf("%s\n%s\nWholegenome: %d\nCg: %d\nFormat:%d\n", td.obs_head, td.obs_seq, td.wholegenome, td.cg, td.format);
-        viterbi(td.hmm, td.train, td.obs_seq, td.out, td.aa, td.dna, td.obs_head, td.wholegenome, td.cg, td.format);
+        viterbi(td.hmm, td.train, td.obs_seq, td.out, td.aa, td.dna, td.obs_head, td.wholegenome, td.cg, td.format, &td.alpha, &td.path);
+        backtrack(td.hmm, td.train, td.obs_seq, td.out, td.aa, td.dna, td.obs_head, td.wholegenome, td.cg, td.format, &td.alpha, &td.path);
     }
 
     free(td.obs_seq);
@@ -249,7 +252,7 @@ void* thread_func(void *threadarr)
     d = (thread_data*)threadarr;
     d->cg = get_prob_from_cg(d->hmm, d->train, d->obs_seq); //cg - 26 Ye April 16, 2016
     if (strlen(d->obs_seq)>70){
-        viterbi(d->hmm, d->train, d->obs_seq, d->out, d->aa, d->dna, d->obs_head, d->wholegenome, d->cg, d->format);
+        viterbi(d->hmm, d->train, d->obs_seq, d->out, d->aa, d->dna, d->obs_head, d->wholegenome, d->cg, d->format, &(d->alpha), &(d->path));
     }
 }
 
