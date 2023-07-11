@@ -7,183 +7,229 @@
 #include <ctype.h>
 #include "hmm.h"
 #include "util_lib.h"
-#define viterbi_out_flg
+//#define viterbi_out_flg
 
 void dump_memory(void *p, int size);
 
-void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,
-                            char *head, int whole_genome, int cg, int format,
-                            double ***alpha_ptr, int ***path_ptr){
-  double max_dbl = 10000000000.0;
-  int debug=0;
+ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result, double ***alpha_ptr,
+             int ***path_ptr) {
+    double max_dbl = 10000000000.0;
 
-  int *vpath;                          /* optimal path after backtracking */
-  double **alpha;                      /* viterbi prob array */
-  int **path;                          /* viterbi path array */
-  int i, j, l, m, n, x, y, z, t, jj, kk;
-  int temp_t;
-  int ag_num;
+    double **alpha;                      /* viterbi prob array */
+    int **path;                          /* viterbi path array */
+    int i, j, t;
 
-  int orf_start=0;
-  int orf_strand=0;
-  int print_save;
-  int frame_save;
-  int orf_save;
-  double prob_save, start_freq;
+    double start_freq;
 
-  int best;
-  int from, from0, to;   /*from0: i-2 position, from: i-1 position */
-  int from2;             /* from2: i-2, i-1 for condition in emission probability */
+    int from, from0, to;   /*from0: i-2 position, from: i-1 position */
+    int from2;             /* from2: i-2, i-1 for condition in emission probability */
 
-  double temp_alpha, temp, prob, prob2;
-  int len_seq;
-  int gene_len;
-  int count_ag;
+    double temp_alpha;
+    int len_seq;
+    int prev_len_seq;
+    int gene_len;
 
-  int temp_strand;
-  int num_d;          /* the number of delete */
-  int freq_id;
-  double h_kd, r_kd, p_kd;
+    int num_d;          /* the number of delete */
+    int freq_id;
+    double h_kd, r_kd, p_kd;
 
-  int codon_start;
-  char dna_tmp[300000];
-  char dna[300000];
-  char dna1[300000];
-  char dna_f[300000];
-  char dna_f1[300000];
-  char protein[100000];
-  int dna_id=0;
-  int dna_f_id=0;
-  int out_nt;
-  int start_t, dna_start_t;
-  int end_t;
-  int prev_match;
-  int start_orf;
-  int frame;
-  double final_score;
+    int temp_i[6] = {0,0,0,0,0,0};
+    int temp_i_1[6] = {0,0,0,0,0,0};
 
-  int insert[100];
-  int delete[100];
-  int insert_id, delete_id;
-  char *head_short=NULL;
-  char delimi[] = " ";
+    int num_N=0;
 
-  int temp_i[6] = {0,0,0,0,0,0};
-  int temp_i_1[6] = {0,0,0,0,0,0};
+    char *prev_O;
 
-  int num_N=0;
-  /***************************************************************/
-  /* initialize                                                  */
-  /***************************************************************/
-  int refine = 0;
-  if (whole_genome==1){
-    gene_len = 120;
-    refine = 1;
-  }else{
-    gene_len = 60;
-  }
 
-  len_seq = strlen(O);
-  *alpha_ptr = (double **)dmatrix(hmm_ptr->N, len_seq);
-  *path_ptr = (int **)imatrix(hmm_ptr->N, len_seq);
-  alpha = *alpha_ptr;//29 x length(sequece)
-  path = *path_ptr;
-  vpath = (int *)ivector(len_seq);
+    /***************************************************************/
+    /* initialize                                                  */
+    /***************************************************************/
 
-  for (i=0; i<hmm_ptr->N; i++){
-    alpha[i][0] = -1 * hmm_ptr->pi[i];
-  }
+    double log53 = log(0.53);
+    double log16 = log(0.16);
+    double log30 = log(0.30);
+    double log25 = log(0.25);
+    double log95 = log(0.95);
+    double log54 = log(0.54);
+    double log83 = log(0.83);
+    double log07 = log(0.07);
 
-  double log53 = log(0.53);
-  double log16 = log(0.16);
-  double log30 = log(0.30);
-  double log25 = log(0.25);
-  double log95 = log(0.95);
-  double log54 = log(0.54);
-  double log83 = log(0.83);
-  double log07 = log(0.07);
-  /* stop state */
-  if ((O[0] == 'T'|| O[0] == 't')  && //It would be much simpler to use toupper() function in the beginning instead of checking complex conditions. 
-      (((O[1] == 'A'|| O[1] == 'a') && (O[2] == 'A'|| O[2] == 'a')) ||
-       ((O[1] == 'A'|| O[1] == 'a') && (O[2] == 'G'|| O[2] == 'g')) ||
-       ((O[1] == 'G'|| O[1] == 'g') && (O[2] == 'A'|| O[2] == 'a')))) {
+    len_seq = strlen(O);
+    *alpha_ptr = (double **)dmatrix(hmm_ptr->N, len_seq);
+    *path_ptr = (int **)imatrix(hmm_ptr->N, len_seq);
+    alpha = *alpha_ptr;//29 x length(sequece)
+    path = *path_ptr;
 
-    alpha[E_STATE][0] = max_dbl;
-    alpha[E_STATE][1] = max_dbl;
-    path[E_STATE][1] = E_STATE;
-    path[E_STATE][2] = E_STATE;
+    ViterbiResult res;
+    res.O = (char*)malloc(len_seq + 1 * sizeof(char));
+    res.O = strcpy(res.O, O);
 
-    alpha[M6_STATE][2] = max_dbl;
-    alpha[M5_STATE][1] = max_dbl;
-    alpha[M4_STATE][0] = max_dbl;
-    alpha[M3_STATE][2] = max_dbl;
-    alpha[M2_STATE][1] = max_dbl;
-    alpha[M1_STATE][0] = max_dbl;
-		/*
-		* 
-		*/
-    if ((O[1] == 'A'|| O[1] == 'a') && (O[2] == 'A'|| O[2] == 'a')){  
-      alpha[E_STATE][2] = alpha[E_STATE][2] - log53;
-    }else if ((O[1] == 'A'|| O[1] == 'a') && (O[2] == 'G'|| O[2] == 'g')){
-      alpha[E_STATE][2] = alpha[E_STATE][2] - log16;
-    }else if((O[1] == 'G'|| O[1] == 'g') && (O[2] == 'A'|| O[2] == 'a')){
-      alpha[E_STATE][2] = alpha[E_STATE][2] - log30;
+    if (!prev_result) {
+        for (i=0; i<hmm_ptr->N; ++i){
+            alpha[i][0] = -1 * hmm_ptr->pi[i];
+        }
+
+        /* stop state */
+        if ((O[0] == 'T'|| O[0] == 't')  && //It would be much simpler to use toupper() function in the beginning instead of checking complex conditions.
+            (((O[1] == 'A'|| O[1] == 'a') && (O[2] == 'A'|| O[2] == 'a')) ||
+            ((O[1] == 'A'|| O[1] == 'a') && (O[2] == 'G'|| O[2] == 'g')) ||
+            ((O[1] == 'G'|| O[1] == 'g') && (O[2] == 'A'|| O[2] == 'a')))) {
+
+            alpha[E_STATE][0] = max_dbl;
+            alpha[E_STATE][1] = max_dbl;
+            path[E_STATE][1] = E_STATE;
+            path[E_STATE][2] = E_STATE;
+
+            alpha[M6_STATE][2] = max_dbl;
+            alpha[M5_STATE][1] = max_dbl;
+            alpha[M4_STATE][0] = max_dbl;
+            alpha[M3_STATE][2] = max_dbl;
+            alpha[M2_STATE][1] = max_dbl;
+            alpha[M1_STATE][0] = max_dbl;
+
+
+            if ((O[1] == 'A'|| O[1] == 'a') && (O[2] == 'A'|| O[2] == 'a')){
+                alpha[E_STATE][2] = alpha[E_STATE][2] - log53;
+            }else if ((O[1] == 'A'|| O[1] == 'a') && (O[2] == 'G'|| O[2] == 'g')){
+                alpha[E_STATE][2] = alpha[E_STATE][2] - log16;
+            }else if((O[1] == 'G'|| O[1] == 'g') && (O[2] == 'A'|| O[2] == 'a')){
+                alpha[E_STATE][2] = alpha[E_STATE][2] - log30;
+            }
+        }
+        //reverse-complimentary stop-codons
+        if ((O[2] == 'A'|| O[0] == 'a')  &&
+            (((O[0] == 'T'|| O[0] == 't') && (O[1] == 'T'|| O[1] == 't')) ||
+            ((O[0] == 'C'|| O[0] == 'c') && (O[1] == 'T'|| O[1] == 't')) ||
+            ((O[0] == 'T'|| O[0] == 't') && (O[1] == 'C'|| O[1] == 'c')))) {
+
+            alpha[S_STATE_1][0] = max_dbl;
+            alpha[S_STATE_1][1] = max_dbl;
+            alpha[S_STATE_1][2] = alpha[S_STATE][0];
+            path[S_STATE_1][1] = S_STATE_1;
+            path[S_STATE_1][2] = S_STATE_1;
+
+            alpha[M3_STATE_1][2] = max_dbl;
+            alpha[M6_STATE_1][2] = max_dbl;
+
+            if ((O[0] == 'T'|| O[0] == 't') && (O[1] == 'T'|| O[1] == 't')){
+                alpha[S_STATE_1][2] = alpha[S_STATE_1][2] - log53;
+            }else if ((O[0] == 'C'|| O[0] == 'c') && (O[1] == 'T'|| O[1] == 't')){
+                alpha[S_STATE_1][2] = alpha[S_STATE_1][2] - log16;
+            }else if((O[0] == 'T'|| O[0] == 't') && (O[1] == 'C'|| O[1] == 'c')){
+                alpha[S_STATE_1][2] = alpha[S_STATE_1][2] - log30;
+            }
+        }
+    } else {
+        prev_len_seq = (!prev_result) ? 0 : strlen(prev_result->O);
+        prev_O = prev_result->O;
+
+        from = prev_O[prev_len_seq - 1];
+        from0 = prev_O[prev_len_seq - 2];
+        to = nt2int(O[0]);
+
+        if (from==4){ from=2; } //Why do we change other nt to G? G is 2 according to defines and nt2int.
+        if (from0==4){ from0=2; }
+        if (to==4){
+            to = 2;
+            num_N += 1;
+        }else{
+            num_N = 0;
+        }
+        from2 = from0 * 4 + from;
+
+        /*
+         * M state
+         */
+        for (i = M1_STATE; i <= M6_STATE; ++i){
+            if (i == M1_STATE){
+                /*from M state*/
+                j = M6_STATE;
+                alpha[i][0] = prev_result->alpha[j][prev_len_seq - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to];
+                path[i][0] = j;
+                /*from D state*/
+                if (whole_genome == 0){
+                    for (j = M5_STATE; j >= M1_STATE; --j){
+                        num_d = i - j + 6;
+                        if ( num_d > 0 ){
+                            temp_alpha = prev_result->alpha[j][prev_len_seq - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[0][from2][to] -
+                                    log25 * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
+                            if ( temp_alpha < alpha[i][0] ) {
+                                alpha[i][0] = temp_alpha;
+                                path[i][0] = j;
+                            }
+                        }
+                    }
+                }
+                // From Start state
+                temp_alpha = prev_result->alpha[S_STATE][prev_len_seq - 1] - hmm_ptr->e_M[0][from2][to];
+                if ( temp_alpha < alpha[i][0] ) {
+                    alpha[i][0] = temp_alpha;
+                    path[i][0] = S_STATE;
+                }
+            } else { // i = M2, ..., M6
+
+                //from M state
+                j = i - 1;
+                alpha[i][0] = prev_result->alpha[j][prev_len_seq - 1] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i-M1_STATE][from2][to];
+                path[i][0] = j;
+
+                //from D state
+                if ( whole_genome == 0){
+                    for (j = M6_STATE; j >= M1_STATE; --j){
+                        if (j >= i){
+                            num_d = i - j + 6;
+                        } else if (j + 1 < i) {
+                            num_d = i - j;
+                        } else {
+                            num_d = -10;
+                        }
+
+                        if (num_d > 0){
+                            temp_alpha = prev_result->alpha[j][prev_len_seq - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[i - M1_STATE][from2][to]
+                                        - log25 * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
+                            if ( temp_alpha < alpha[i][0] ){
+                                alpha[i][0] = temp_alpha;
+                                path[i][0] = j;
+                            }
+                        }
+                    }
+                }
+            }
+
+            //from I state
+
+        }
     }
-  }
-	//reverse-complimentary stop-codons 
-  if ((O[2] == 'A'|| O[0] == 'a')  &&
-      (((O[0] == 'T'|| O[0] == 't') && (O[1] == 'T'|| O[1] == 't')) ||
-       ((O[0] == 'C'|| O[0] == 'c') && (O[1] == 'T'|| O[1] == 't')) ||
-       ((O[0] == 'T'|| O[0] == 't') && (O[1] == 'C'|| O[1] == 'c')))) {
+    /******************************************************************/
+    /*  fill out the rest of the columns                              */
+    /******************************************************************/
+    for (t = 1; t < len_seq; t++) {
+        from = nt2int(O[t-1]); //from and to are emitted symbols
+        if (t>1){
+            from0 = nt2int(O[t-2]);
+        }else{
+            from0 = 2;
+        }
+        to = nt2int(O[t]);
 
-    alpha[S_STATE_1][0] = max_dbl;
-    alpha[S_STATE_1][1] = max_dbl;
-    alpha[S_STATE_1][2] = alpha[S_STATE][0];
-    path[S_STATE_1][1] = S_STATE_1;
-    path[S_STATE_1][2] = S_STATE_1;
+        /* if DNA is other than ACGT, do it later */
+        if (from==4){ from=2; } //Why do we change other nt to G? G is 2 according to defines and nt2int.
+        if (from0==4){ from0=2; }
+        if (to==4){
+            to = 2;
+            num_N += 1;
+        }else{
+            num_N = 0;
+        }
+        from2 = from0 * 4 + from;
 
-    alpha[M3_STATE_1][2] = max_dbl;
-    alpha[M6_STATE_1][2] = max_dbl;
+        /******************/
+        /* M state        */
+        /******************/
 
-    if ((O[0] == 'T'|| O[0] == 't') && (O[1] == 'T'|| O[1] == 't')){
-      alpha[S_STATE_1][2] = alpha[S_STATE_1][2] - log53;
-    }else if ((O[0] == 'C'|| O[0] == 'c') && (O[1] == 'T'|| O[1] == 't')){
-      alpha[S_STATE_1][2] = alpha[S_STATE_1][2] - log16;
-    }else if((O[0] == 'T'|| O[0] == 't') && (O[1] == 'C'|| O[1] == 'c')){
-      alpha[S_STATE_1][2] = alpha[S_STATE_1][2] - log30;
-    }
-  }
+        for (i = M1_STATE; i <= M6_STATE; i++) {
 
-  /******************************************************************/
-  /*  fill out the rest of the columns                              */
-  /******************************************************************/
-  for (t = 1; t < len_seq; t++) {
-    from = nt2int(O[t-1]); //from and to are emitted symbols
-    if (t>1){
-      from0 = nt2int(O[t-2]);
-    }else{
-      from0 = 2;
-    }
-    to = nt2int(O[t]);
-
-    /* if DNA is other than ACGT, do it later */
-    if (from==4){ from=2; } //Why do we change other nt to G? G is 2 according to defines and nt2int.
-    if (from0==4){ from0=2; }
-    if (to==4){
-      to = 2;
-      num_N += 1;
-    }else{
-      num_N = 0;
-    }
-    from2 = from0 * 4 + from;
-
-    /******************/
-    /* M state        */
-    /******************/
-
-    for (i = M1_STATE; i <= M6_STATE; i++)   {
-
-      if (alpha[i][t]<max_dbl){
+            if (alpha[i][t]<max_dbl){
 
 				if (t == 0){
 
@@ -203,7 +249,7 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
 								}else if (j + 1 < i){ // Условие --- бред. Здесь j >= i, по условию в цикле for, т.к. i = M1_STATE. Зачем этот забор из if? 
 									num_d = i - j;
 								}else{
-									num_d = -10;
+                                    num_d = -10; //Что это за костыль вообще? Почему не 15, не 25?
 								}
 								if(num_d > 0){ // num_d > 0 for any j in this loop. 
 									temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[0][from2][to]    // 0 = M1_STATE - M1_STATE
@@ -282,17 +328,17 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
 						}
 					}
 				}
-      }
-    }
+            }
+        }
 
-    /******************/
-    /* I state        */
-    /******************/
-    for (i=I1_STATE; i<=I6_STATE; i++) {
+        /******************/
+        /* I state        */
+        /******************/
+        for (i=I1_STATE; i<=I6_STATE; i++) {
 
-      if (t==0){
+            if (t==0){
 
-      }else{
+            }else{
 
 				/* from I state */
 				j = i;
@@ -312,8 +358,8 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
 
 					temp_i[i-I1_STATE] = t-1;
 				}
-      }
-    }
+            }
+        }
 
     /******************/
     /* M' state        */
@@ -767,20 +813,29 @@ void viterbi(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa,
     print_viterbi(alpha, len_seq, NUM_STATE, f);
     fclose(f);
 #endif
+    res.alpha = alpha;
+    res.path = path;
 
-    free_ivector(vpath);
-
+    res.len_seq = len_seq;
+    for (i = 0; i < 6; ++i){
+        res.temp_i[i] = temp_i[i];
+        res.temp_i_1[i] = temp_i_1[i];
+    }
+    return res;
 }
 
-void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, char *O, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,char *head, int whole_genome, int cg, int format,
-               double ***alpha_ptr, int *** path_ptr){
+
+
+void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,char *head, int whole_genome, int cg, int format,
+               ViterbiResult *viterbi_result){
     char *head_short=NULL;
     char delimi[] = " ";
     double max_dbl = 10000000000.0;
     double prob = max_dbl, final_score;
-    double **alpha = *alpha_ptr;
-    int **path = *path_ptr;
-    int i, j, t, kk, len_seq = strlen(O);
+    double **alpha = viterbi_result->alpha;
+    int **path = viterbi_result->path;
+    int i, j, t, kk, len_seq = strlen(viterbi_result->O);
+    char* O = viterbi_result->O;
     int *  vpath = (int *)ivector(len_seq);
     int print_save, codon_start;
     int start_t, dna_start_t;
@@ -1147,6 +1202,41 @@ int get_prob_from_cg(HMM *hmm_ptr, TRAIN *train_ptr, char *O){ //change from voi
 }
 
 
+int get_prob_form_cg(HMM *hmm_ptr, TRAIN *train_ptr, Graph *g){
+    unsigned long long cg_count = 0, total_len = 0;
+    int i, j;
+    for (i = 0; i < g->n_edge; ++i){
+        total_len += g->seq_len[i];
+        for (j = 0; j < g->seq_len[i]; ++j){
+            if (g->obs_seq[i][j] == 'C' || g->obs_seq[i][j] =='c' || g->obs_seq[i][j] == 'G' || g->obs_seq[i][j] == 'g'){
+                ++cg_count;
+            }
+        }
+    }
+    cg_count = floor((double)cg_count / total_len * 100.0) - 26;
+    if (cg_count < 0) {
+        cg_count = 0;
+    }
+    else if (cg_count > 43) {
+        cg_count = 43;
+    }
+
+    memcpy(hmm_ptr->e_M, train_ptr->trans[cg_count], sizeof(hmm_ptr->e_M));
+    memcpy(hmm_ptr->e_M_1, train_ptr->rtrans[cg_count], sizeof(hmm_ptr->e_M_1));
+    memcpy(hmm_ptr->tr_R_R, train_ptr->noncoding[cg_count], sizeof(hmm_ptr->tr_R_R));
+    memcpy(hmm_ptr->tr_S, train_ptr->start[cg_count], sizeof(hmm_ptr->tr_S));
+    memcpy(hmm_ptr->tr_E, train_ptr->stop[cg_count], sizeof(hmm_ptr->tr_E));
+    memcpy(hmm_ptr->tr_S_1, train_ptr->start1[cg_count], sizeof(hmm_ptr->tr_S_1));
+    memcpy(hmm_ptr->tr_E_1, train_ptr->stop1[cg_count], sizeof(hmm_ptr->tr_E_1));
+    memcpy(hmm_ptr->S_dist, train_ptr->S_dist[cg_count], sizeof(hmm_ptr->S_dist));
+    memcpy(hmm_ptr->E_dist, train_ptr->E_dist[cg_count], sizeof(hmm_ptr->E_dist));
+    memcpy(hmm_ptr->S1_dist, train_ptr->S1_dist[cg_count], sizeof(hmm_ptr->S1_dist));
+    memcpy(hmm_ptr->E1_dist, train_ptr->E1_dist[cg_count], sizeof(hmm_ptr->E1_dist));
+
+
+    return cg_count;
+}
+
 
 void get_train_from_file(char *filename, HMM *hmm_ptr, char *mfilename, char *mfilename1, char *nfilename,
 			 char *sfilename,char *pfilename,char *s1filename,char *p1filename,char *dfilename, TRAIN *train_ptr){
@@ -1372,3 +1462,72 @@ void dump_memory(void *p, int size)
 	printf("\n");
 }
 
+void free_ViterbiResult(ViterbiResult* res){
+    if (res->alpha) {
+        free_dmatrix(res->alpha, NUM_STATE);
+    }
+    if (res->path) {
+        free_imatrix(res->path, NUM_STATE);
+    }
+    free(res->O);
+}
+
+Graph read_graph(FILE* fp){
+    char tmp_str[STRINGLEN] = "";
+    Graph res;
+    res.n_edge = 0;
+    int i, j;
+
+    //find number of edges
+    while (fgets(tmp_str, sizeof(tmp_str), fp)){
+        if (tmp_str[0] == '>')
+            ++res.n_edge;
+    }
+    res.seq_len = (int*)malloc(res.n_edge * sizeof(int));
+    res.obs_seq = (char**)malloc(res.n_edge * sizeof (char*));
+    rewind(fp);
+    //find length of each sequence
+    i = -1;
+
+   //read the line, which starts with '>'
+    while (fgets(tmp_str, sizeof(tmp_str), fp)){
+        if (tmp_str[0] == '>'){
+            if (i >= 0) {
+                res.obs_seq[i] = (char*)malloc((res.seq_len[i] + 1) * sizeof(char));
+            }
+            ++i;
+            res.seq_len[i] = 0;
+        } else {
+            res.seq_len[i] += strlen(tmp_str) - 1;
+        }
+    }
+    res.obs_seq[i] = (char*)malloc((res.seq_len[i] + 1) * sizeof(char));
+    rewind(fp);
+
+
+    i = -1;
+    while (fgets(tmp_str, sizeof(tmp_str), fp)) {
+        if (tmp_str[0] == '>'){
+            ++i;
+        } else {
+            for (j = 0; j < strlen(tmp_str); ++j)
+                if (!isalpha(tmp_str[j]))
+                    tmp_str[j] = '\0';
+            strcat(res.obs_seq[i], tmp_str);
+        }
+    }
+    return res;
+}
+
+void free_graph(Graph *g){
+    int i;
+    if (g->seq_len)
+        free(g->seq_len);
+    if (g->obs_seq){
+        for (i = 0; i < g->n_edge; ++i)
+            if (g->obs_seq[i])
+                free(g->obs_seq[i]);
+        free(g->obs_seq);
+    }
+    return;
+}

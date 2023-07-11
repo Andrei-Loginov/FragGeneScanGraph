@@ -35,7 +35,7 @@ int main (int argc, char **argv)
     clock_t start = clock();
     int i, j, c, max;
     HMM hmm;
-    char *obs_seq, *obs_head;
+    char **obs_seq, **obs_head;
     TRAIN train;
     int wholegenome;
     int format=0;
@@ -65,6 +65,7 @@ int main (int argc, char **argv)
     int head_len;
     int threadnum = 1;
     int rc;
+    int edge_num;
 
     thread_data *threadarr;
     char **lastline, **currline;
@@ -202,6 +203,9 @@ int main (int argc, char **argv)
     td.format = format;
 
     fp = fopen(seq_file, "r");
+    edge_num = 0;
+
+
     bp_count = 0;
     while (fgets(tmp_str, sizeof(tmp_str), fp)){
         if (tmp_str[0] == '>'){
@@ -230,8 +234,9 @@ int main (int argc, char **argv)
     //printf("%s\n%s\n", td.obs_head, td.obs_seq);
     if (strlen(td.obs_seq) > 70) {
         //printf("%s\n%s\nWholegenome: %d\nCg: %d\nFormat:%d\n", td.obs_head, td.obs_seq, td.wholegenome, td.cg, td.format);
-        viterbi(td.hmm, td.train, td.obs_seq, td.out, td.aa, td.dna, td.obs_head, td.wholegenome, td.cg, td.format, &td.alpha, &td.path);
-        backtrack(td.hmm, td.train, td.obs_seq, td.out, td.aa, td.dna, td.obs_head, td.wholegenome, td.cg, td.format, &td.alpha, &td.path);
+        ViterbiResult res= viterbi(td.hmm, td.obs_seq, td.wholegenome, NULL, &td.alpha, &td.path);
+        backtrack(td.hmm, td.train, td.out, td.aa, td.dna, td.obs_head, td.wholegenome, td.cg, td.format, &res);
+        free_ViterbiResult(&res);
     }
 
     free(td.obs_seq);
@@ -252,7 +257,7 @@ void* thread_func(void *threadarr)
     d = (thread_data*)threadarr;
     d->cg = get_prob_from_cg(d->hmm, d->train, d->obs_seq); //cg - 26 Ye April 16, 2016
     if (strlen(d->obs_seq)>70){
-        viterbi(d->hmm, d->train, d->obs_seq, d->out, d->aa, d->dna, d->obs_head, d->wholegenome, d->cg, d->format, &(d->alpha), &(d->path));
+        viterbi(d->hmm, d->obs_seq, d->wholegenome, NULL, &(d->alpha), &(d->path));
     }
 }
 
