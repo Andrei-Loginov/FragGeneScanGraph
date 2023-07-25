@@ -7,12 +7,14 @@
 #include <ctype.h>
 #include "hmm.h"
 #include "util_lib.h"
-//#define viterbi_out_flg
+#define viterbi_out_flg
 
 void dump_memory(void *p, int size);
 
-ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result, double ***alpha_ptr,
-             int ***path_ptr) {
+ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result) {
+#ifdef viterbi_out_flg
+    printf("Viterbi start\n");
+#endif
     double max_dbl = 10000000000.0;
 
     double **alpha;                      /* viterbi prob array */
@@ -37,6 +39,7 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
     int temp_i_1[6] = {0,0,0,0,0,0};
 
     int num_N=0;
+    ViterbiResult res;
 
     char *prev_O;
 
@@ -55,12 +58,11 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
     double log07 = log(0.07);
 
     len_seq = strlen(O);
-    *alpha_ptr = (double **)dmatrix(hmm_ptr->N, len_seq);
-    *path_ptr = (int **)imatrix(hmm_ptr->N, len_seq);
-    alpha = *alpha_ptr;//29 x length(sequece)
-    path = *path_ptr;
+    res.alpha = (double **)dmatrix(hmm_ptr->N, len_seq);
+    res.path = (int **)imatrix(hmm_ptr->N, len_seq);
+    alpha = res.alpha;//29 x length(sequece)
+    path = res.path;
 
-    ViterbiResult res;
     res.O = (char*)malloc(len_seq + 1 * sizeof(char));
     res.O = strcpy(res.O, O);
 
@@ -841,10 +843,10 @@ void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *
     int start_t, dna_start_t;
 
     char dna_tmp[300000];
-    char dna[300000];
-    char dna1[300000];
-    char dna_f[300000];
-    char dna_f1[300000];
+    char dna[300010];
+    char dna1[300010];
+    char dna_f[300010];
+    char dna_f1[300010];
     char protein[100000];
     int dna_id=0, dna_f_id=0;
 
@@ -1202,7 +1204,11 @@ int get_prob_from_cg(HMM *hmm_ptr, TRAIN *train_ptr, char *O){ //change from voi
 }
 
 
-int get_prob_form_cg(HMM *hmm_ptr, TRAIN *train_ptr, Graph *g){
+int get_prob_form_cg_graph(HMM *hmm_ptr, TRAIN *train_ptr, Graph *g){
+#ifdef viterbi_out_flg
+    printf("get_prob_from_cg(HMM*,TRAIN*, Grpah*))\n");
+#endif
+
     unsigned long long cg_count = 0, total_len = 0;
     int i, j;
     for (i = 0; i < g->n_edge; ++i){
@@ -1472,50 +1478,53 @@ void free_ViterbiResult(ViterbiResult* res){
     free(res->O);
 }
 
-Graph read_graph(FILE* fp){
-    char tmp_str[STRINGLEN] = "";
+
+Graph read_graph(FILE *fp, FILE *fp_matr){
     Graph res;
-    res.n_edge = 0;
-    int i, j;
+    size_t i, j;
 
-    //find number of edges
-    while (fgets(tmp_str, sizeof(tmp_str), fp)){
-        if (tmp_str[0] == '>')
-            ++res.n_edge;
+    fscanf(fp_matr, "%zd", &res.n_edge);
+    res.adjacency_matrix = (int**)malloc(res.n_edge * sizeof(int*));
+    for (i = 0; i < res.n_edge; ++i){
+        res.adjacency_matrix[i] = (int*)malloc(res.n_edge * sizeof(int));
+        for (j = 0; j < res.n_edge; ++j)
+            fscanf(fp_matr, "%d", &res.adjacency_matrix[i][j]);
     }
-    res.seq_len = (int*)malloc(res.n_edge * sizeof(int));
-    res.obs_seq = (char**)malloc(res.n_edge * sizeof (char*));
-    rewind(fp);
-    //find length of each sequence
-    i = -1;
 
-   //read the line, which starts with '>'
-    while (fgets(tmp_str, sizeof(tmp_str), fp)){
-        if (tmp_str[0] == '>'){
-            if (i >= 0) {
-                res.obs_seq[i] = (char*)malloc((res.seq_len[i] + 1) * sizeof(char));
-            }
-            ++i;
-            res.seq_len[i] = 0;
-        } else {
-            res.seq_len[i] += strlen(tmp_str) - 1;
+    res.seq_len = (int*)malloc(res.n_edge * sizeof (int));
+    res.head = (char**)malloc(res.n_edge * sizeof(char*));
+    res.obs_seq = (char**)malloc(res.n_edge * sizeof(char*));
+
+    char tmp_str[STRINGLEN] = "";
+
+    fgets(tmp_str, sizeof(tmp_str), fp);
+    for (i = 0; i < res.n_edge; ++i){
+        if (tmp_str[strlen(tmp_str) - 1] == 10) tmp_str[strlen(tmp_str) - 1] = '\0';
+        res.head[i] = (char*)malloc((strlen(tmp_str) + 1) * sizeof(char));
+        strcpy(res.head[i], tmp_str);
+
+        res.seq_len[i] = 0;
+        while (fgets(tmp_str, sizeof(tmp_str), fp)){
+            if (tmp_str[0] == '>')
+                break;
+            res.seq_len[i] += sizeof(tmp_str);
         }
+        res.obs_seq[i] = (char*)malloc((res.seq_len[i] + 1) * sizeof(char));
     }
-    res.obs_seq[i] = (char*)malloc((res.seq_len[i] + 1) * sizeof(char));
     rewind(fp);
 
-
-    i = -1;
-    while (fgets(tmp_str, sizeof(tmp_str), fp)) {
-        if (tmp_str[0] == '>'){
-            ++i;
-        } else {
+    fgets(tmp_str, sizeof(tmp_str), fp);
+    for (i = 0; i < res.n_edge; ++i){
+        while(fgets(tmp_str, sizeof(tmp_str), fp)){
+            if (tmp_str[0] == '>')
+                break;
             for (j = 0; j < strlen(tmp_str); ++j)
                 if (!isalpha(tmp_str[j]))
                     tmp_str[j] = '\0';
             strcat(res.obs_seq[i], tmp_str);
         }
     }
+
     return res;
 }
 
@@ -1529,5 +1538,20 @@ void free_graph(Graph *g){
                 free(g->obs_seq[i]);
         free(g->obs_seq);
     }
+    if (g ->adjacency_matrix){
+        for (i = 0; i < g->n_edge; ++i)
+            if (g->adjacency_matrix[i])
+                free(g->adjacency_matrix[i]);
+        free(g->adjacency_matrix);
+    }
+
+    if (g->head){
+        for (i = 0; i < g->n_edge; ++i){
+            if (g->head[i])
+                free(g->head[i]);
+        }
+        free(g->head);
+    }
+
     return;
 }

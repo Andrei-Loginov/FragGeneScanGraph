@@ -28,7 +28,6 @@ typedef struct thread_data
     int **path;
 } thread_data;
 
-void* thread_func(void *threadarr);
 
 int main (int argc, char **argv)
 {
@@ -37,9 +36,10 @@ int main (int argc, char **argv)
     HMM hmm;
     char **obs_seq, **obs_head;
     TRAIN train;
+    Graph g;
     int wholegenome;
     int format=0;
-    FILE *fp_out, *fp_aa, *fp_dna, *fp;
+    FILE *fp_out, *fp_aa, *fp_dna, *fp, *fp_matr;
     char hmm_file[STRINGLEN] = "";
     char out_header[STRINGLEN] = "";
     char aa_file[STRINGLEN] = "";
@@ -66,6 +66,7 @@ int main (int argc, char **argv)
     int threadnum = 1;
     int rc;
     int edge_num;
+    int cg_count;
 
     thread_data *threadarr;
     char **lastline, **currline;
@@ -189,77 +190,47 @@ int main (int argc, char **argv)
 
     thread_data td;
     sprintf(tmp_str, "%s.out", out_header);
-    td.out = fopen(tmp_str, "w");
+    fp_out = fopen(tmp_str, "w");
 
     sprintf(tmp_str, "%s.faa", out_header);
-    td.aa = fopen(tmp_str, "w");
+    fp_aa = fopen(tmp_str, "w");
 
     sprintf(tmp_str, "%s.ffn", out_header);
-    td.dna = fopen(tmp_str, "w");
+    fp_dna = fopen(tmp_str, "w");
 
-    td.hmm = &hmm;
-    td.train = &train;
-    td.wholegenome = wholegenome;
-    td.format = format;
 
     fp = fopen(seq_file, "r");
+    sprintf(tmp_str, "%s-matrix.txt", seq_file);
+    fp_matr = fopen(tmp_str, "r");
     edge_num = 0;
 
 
-    bp_count = 0;
-    while (fgets(tmp_str, sizeof(tmp_str), fp)){
-        if (tmp_str[0] == '>'){
-            head_len = strlen(tmp_str);
-        } else {
-            bp_count += strlen(tmp_str);
-        }
-    }
-    ++bp_count;
-    td.obs_seq = (char*)malloc(bp_count * sizeof(char));
-    td.obs_head = (char*)malloc(head_len);
 
-    rewind(fp);
-    while (fgets(tmp_str, sizeof(tmp_str), fp)){
-        if (tmp_str[0] == '>'){
-            strcpy(td.obs_head, tmp_str);
-        } else {
-            for (i = 0; i < strlen(tmp_str); ++i)
-                if (!isalpha(tmp_str[i]))
-                    tmp_str[i] = '\0';
-            strcat(td.obs_seq, tmp_str);   
+    g = read_graph(fp, fp_matr);
+
+    cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
+
+    for (i = 0; i < g.n_edge; ++i){
+        //printf("Before Viterbi call\n");
+        if (g.seq_len[i] > 70) {
+            ViterbiResult res = viterbi(&hmm, g.obs_seq[i], wholegenome, NULL);
+            //backtrack(&hmm, &train, fp_out, fp_aa, fp_dna, g.head[i], wholegenome, cg_count, format, &res);
+            free_ViterbiResult(&res);
         }
     }
 
-    td.cg = get_prob_from_cg(td.hmm, td.train, td.obs_seq);
-    //printf("%s\n%s\n", td.obs_head, td.obs_seq);
-    if (strlen(td.obs_seq) > 70) {
-        //printf("%s\n%s\nWholegenome: %d\nCg: %d\nFormat:%d\n", td.obs_head, td.obs_seq, td.wholegenome, td.cg, td.format);
-        ViterbiResult res= viterbi(td.hmm, td.obs_seq, td.wholegenome, NULL, &td.alpha, &td.path);
-        backtrack(td.hmm, td.train, td.out, td.aa, td.dna, td.obs_head, td.wholegenome, td.cg, td.format, &res);
-        free_ViterbiResult(&res);
-    }
-
-    free(td.obs_seq);
-    free(td.obs_head);
+    free_graph(&g);
 
     fclose(fp);
-    fclose(td.out);
-    fclose(td.aa);
-    fclose(td.dna);
+    fclose(fp_out);
+    fclose(fp_aa);
+    fclose(fp_dna);
     clock_t end = clock();
     printf("Clock time used (by %d threads) = %.2f mins\n", threadnum, (end - start) / (60.0 * CLOCKS_PER_SEC));
 }
 
 
-void* thread_func(void *threadarr)
-{
-    thread_data *d;
-    d = (thread_data*)threadarr;
-    d->cg = get_prob_from_cg(d->hmm, d->train, d->obs_seq); //cg - 26 Ye April 16, 2016
-    if (strlen(d->obs_seq)>70){
-        viterbi(d->hmm, d->obs_seq, d->wholegenome, NULL, &(d->alpha), &(d->path));
-    }
-}
+
 
 int appendSeq(char *input, char **seq, int input_max)
 {

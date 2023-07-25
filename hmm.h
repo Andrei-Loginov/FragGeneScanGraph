@@ -104,9 +104,11 @@ typedef struct {
 } TRAIN;
 
 typedef struct {
-    int n_edge;
-    char** obs_seq;
+    size_t n_edge;
+    int** adjacency_matrix;
     int* seq_len;
+    char** obs_seq;
+    char** head;
 } Graph;
 
 typedef struct {
@@ -120,10 +122,9 @@ typedef struct {
 
 
 int get_prob_from_cg(HMM *hmm, TRAIN *train, char *O); //return cg - 26 Ye April 16, 2016
-int get_prob_form_cg(HMM *hmm_ptr, TRAIN *train_ptr, Graph *g);
+int get_prob_form_cg_graph(HMM *hmm_ptr, TRAIN *train_ptr, Graph *g);
 void get_train_from_file(char *filename, HMM *hmm_ptr, char *mfilename, char *mfilename1, char *nfilename, char *sfilename,char *pfilename,char *s1filename,char *p1filename, char *dfilename, TRAIN *train_ptr);
-ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result,
-             double ***alpha_ptr, int ***path_ptr);
+ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result);
 void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,char *head, int whole_genome, int cg, int format,
                ViterbiResult *viterbi_result);
 void free_hmm(HMM *hmm);
@@ -132,5 +133,5 @@ void get_protein(char *dna, char *protein, int strand, int whole_genome);
 void get_rc_dna(char *dna, char *dna1);
 void get_corrected_dna(char *dna, char *dna_f);
 
-Graph read_graph(FILE* fp);
+Graph read_graph(FILE* fp, FILE* fp_matr);
 void free_graph(Graph* g);
