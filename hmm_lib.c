@@ -490,20 +490,22 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 				path[i][t] = j;
 
 				/* from M state */
-				if (path[S_STATE_1][t-3]!= R_STATE && path[S_STATE_1][t-4] !=R_STATE && path[S_STATE_1][t-5] !=R_STATE){
-					j = i - I1_STATE_1 + M1_STATE_1;
-					if (i==I6_STATE_1){
-						temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MI] -hmm_ptr->tr_M_I[from][to];
-					}else{
-						temp_alpha = alpha[j][t-1]  - hmm_ptr->tr[TR_MI] -hmm_ptr->tr_M_I[from][to];
-					}
-					if (temp_alpha < alpha[i][t]){
-						alpha[i][t] = temp_alpha;
-						path[i][t] = j;
+                if (t > 4) {
+                    if (path[S_STATE_1][t-3] != R_STATE && path[S_STATE_1][t-4] != R_STATE && path[S_STATE_1][t-5] != R_STATE){
+                        j = i - I1_STATE_1 + M1_STATE_1;
+                        if (i==I6_STATE_1){
+                            temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MI] -hmm_ptr->tr_M_I[from][to];
+                        }else{
+                            temp_alpha = alpha[j][t-1]  - hmm_ptr->tr[TR_MI] -hmm_ptr->tr_M_I[from][to];
+                        }
+                        if (temp_alpha < alpha[i][t]){
+                            alpha[i][t] = temp_alpha;
+                            path[i][t] = j;
 
-						temp_i_1[i-I1_STATE_1] = t-1;
-					}
-				}
+                            temp_i_1[i-I1_STATE_1] = t-1;
+                        }
+                    }
+                }
             }
         }
 
@@ -1163,9 +1165,9 @@ void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *
 #ifdef viterbi_out_flg
     printf("End of viterbi\n");
 #endif
-  free_dmatrix(alpha, hmm_ptr->N);
-  free_imatrix(path, hmm_ptr->N);
-  free_ivector(vpath);
+    //free_dmatrix(alpha, hmm_ptr->N);
+    //free_imatrix(path, hmm_ptr->N);
+    free_ivector(vpath);
     return;
 }
 

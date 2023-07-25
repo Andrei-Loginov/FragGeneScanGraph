@@ -214,7 +214,7 @@ int main (int argc, char **argv)
         //printf("Before Viterbi call\n");
         if (g.seq_len[i] > 70) {
             ViterbiResult res = viterbi(&hmm, g.obs_seq[i], wholegenome, NULL);
-            //backtrack(&hmm, &train, fp_out, fp_aa, fp_dna, g.head[i], wholegenome, cg_count, format, &res);
+            backtrack(&hmm, &train, fp_out, fp_aa, fp_dna, g.head[i], wholegenome, cg_count, format, &res);
             free_ViterbiResult(&res);
         }
     }
