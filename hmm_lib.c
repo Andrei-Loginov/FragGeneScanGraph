@@ -310,6 +310,36 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 					}
 
 					/* to aviod stop codon */
+                    /*
+                    if (t > 2) {
+                        if((i==M2_STATE || i==M5_STATE) && (O[temp_i[j-I1_STATE]] == 'T'||O[temp_i[j-I1_STATE]] =='t') &&
+                                                 (((O[t] == 'A'||O[t] == 'a') && (O[t+1] =='A'||O[t+1] =='a')) ||
+                                                    ((O[t] == 'A'||O[t] == 'a') && (O[t+1] =='G'||O[t+1] =='g')) ||
+                                                    ((O[t] == 'G'||O[t] == 'g') && (O[t+1] =='A'||O[t+1] =='a')))){
+
+                        } else if (temp_i[j - I1_STATE] > 0) {
+                            if (((i==M3_STATE || i==M6_STATE) && (O[temp_i[j-I1_STATE]-1] == 'T'||O[temp_i[j-I1_STATE]-1] =='t') &&
+                                (((O[temp_i[j-I1_STATE]] == 'A'||O[temp_i[j-I1_STATE]] == 'a') && (O[t] =='A'||O[t] == 'a')) ||
+                                ((O[temp_i[j-I1_STATE]] == 'A'||O[temp_i[j-I1_STATE]] == 'a') && (O[t] =='G'||O[t] == 'g')) ||
+                                ((O[temp_i[j-I1_STATE]] == 'G'||O[temp_i[j-I1_STATE]] == 'g') && (O[t] =='A'||O[t] == 'a'))))){
+
+                            }else{
+                                temp_alpha = alpha[j][t-1]  - hmm_ptr->tr[TR_IM] - log25;
+                                if ( temp_alpha < alpha[i][t]){
+                                    alpha[i][t] = temp_alpha;
+                                    path[i][t] = j;
+                                }
+                            }
+                        }
+                    } else {
+                        temp_alpha = alpha[j][t - 1] - hmm_ptr->tr[TR_IM] - log25;
+                        if ( temp_alpha < alpha[i][t]) {
+                            alpha[i][t] = temp_alpha;
+                            path[i][t] = j;
+                        }
+                    }
+                    */
+
 					if (t<2){
       
 					}else if((i==M2_STATE || i==M5_STATE) && (O[temp_i[j-I1_STATE]] == 'T'||O[temp_i[j-I1_STATE]] =='t') &&
@@ -317,18 +347,19 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 							((O[t] == 'A'||O[t] == 'a') && (O[t+1] =='G'||O[t+1] =='g')) ||
 							((O[t] == 'G'||O[t] == 'g') && (O[t+1] =='A'||O[t+1] =='a')))){
 
-					}else if ((i==M3_STATE || i==M6_STATE) && (O[temp_i[j-I1_STATE]-1] == 'T'||O[temp_i[j-I1_STATE]-1] =='t') &&
-					 (((O[temp_i[j-I1_STATE]] == 'A'||O[temp_i[j-I1_STATE]] == 'a') && (O[t] =='A'||O[t] == 'a')) ||
-						((O[temp_i[j-I1_STATE]] == 'A'||O[temp_i[j-I1_STATE]] == 'a') && (O[t] =='G'||O[t] == 'g')) ||
-						((O[temp_i[j-I1_STATE]] == 'G'||O[temp_i[j-I1_STATE]] == 'g') && (O[t] =='A'||O[t] == 'a')))){
-			
+                    }else if ( temp_i[j - I1_STATE] < 1 ||
+                     ((i==M3_STATE || i==M6_STATE) && (O[temp_i[j-I1_STATE]-1] == 'T'||O[temp_i[j-I1_STATE]-1] =='t') &&
+                     (((O[temp_i[j-I1_STATE]] == 'A'||O[temp_i[j-I1_STATE]] == 'a') && (O[t] =='A'||O[t] == 'a')) ||
+                        ((O[temp_i[j-I1_STATE]] == 'A'||O[temp_i[j-I1_STATE]] == 'a') && (O[t] =='G'||O[t] == 'g')) ||
+                        ((O[temp_i[j-I1_STATE]] == 'G'||O[temp_i[j-I1_STATE]] == 'g') && (O[t] =='A'||O[t] == 'a'))))){
+
 					}else{
 						temp_alpha = alpha[j][t-1]  - hmm_ptr->tr[TR_IM] - log25;
 						if ( temp_alpha < alpha[i][t]){
 							alpha[i][t] = temp_alpha;
 							path[i][t] = j;
 						}
-					}
+                    }
 				}
             }
         }
@@ -450,15 +481,16 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 
 					/* to aviod stop codon */
 	  			/* to aviod stop codon */
-          if (t<2){
+                    if (t<2){
 					
 					}else  if((i==M2_STATE_1 || i==M5_STATE_1) && (O[t+1] == 'A'||O[t+1] == 'a') &&
 					   (((O[temp_i_1[j-I1_STATE_1]] == 'T'|| O[temp_i_1[j-I1_STATE_1]] == 't') && (O[t] =='T'|| O[t] =='t')) ||
 							((O[temp_i_1[j-I1_STATE_1]] == 'C'|| O[temp_i_1[j-I1_STATE_1]] == 'c') && (O[t] =='T'|| O[t] =='t')) ||
 							((O[temp_i_1[j-I1_STATE_1]] == 'T'|| O[temp_i_1[j-I1_STATE_1]] == 't') && (O[t] =='C'|| O[t] =='c')))){
 
-					}else if ((i==M3_STATE_1 || i==M6_STATE_1) && (O[t] == 'A'||O[t] == 'a') &&
-						 (((O[temp_i_1[j-I1_STATE_1]-1] == 'T'|| O[temp_i_1[j-I1_STATE_1]-1]=='t') &&
+                    }else if ( temp_i_1[j - I1_STATE_1] > 0 &&
+                            (i==M3_STATE_1 || i==M6_STATE_1) && (O[t] == 'A'||O[t] == 'a') &&
+                            (((O[temp_i_1[j-I1_STATE_1]-1] == 'T'|| O[temp_i_1[j-I1_STATE_1]-1]=='t') &&
 							 (O[temp_i_1[j-I1_STATE_1]] =='T'|| O[temp_i_1[j-I1_STATE_1]] =='t')) || 
 							((O[temp_i_1[j-I1_STATE_1]-1] == 'C'|| O[temp_i_1[j-I1_STATE_1]-1]=='c') &&
 							 (O[temp_i_1[j-I1_STATE_1]] =='T'|| O[temp_i_1[j-I1_STATE_1]] =='t')) || 

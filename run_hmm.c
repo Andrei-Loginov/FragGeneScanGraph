@@ -208,11 +208,12 @@ int main (int argc, char **argv)
 
     g = read_graph(fp, fp_matr);
 
-    cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
+    //cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
 
     for (i = 0; i < g.n_edge; ++i){
         //printf("Before Viterbi call\n");
         if (g.seq_len[i] > 70) {
+            cg_count = get_prob_from_cg(&hmm, &train, g.obs_seq[i]);
             ViterbiResult res = viterbi(&hmm, g.obs_seq[i], wholegenome, NULL);
             backtrack(&hmm, &train, fp_out, fp_aa, fp_dna, g.head[i], wholegenome, cg_count, format, &res);
             free_ViterbiResult(&res);
