@@ -148,6 +148,7 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
                 j = M6_STATE;
                 alpha[i][0] = prev_result->alpha[j][prev_len_seq - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to];
                 path[i][0] = j;
+
                 /*from D state*/
                 if (whole_genome == 0){
                     for (j = M5_STATE; j >= M1_STATE; --j){
@@ -199,6 +200,21 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
             }
 
             //from I state
+            if (i == M1_STATE) {
+                j = I6_STATE;
+            } else {
+                j = I1_STATE + (i - M1_STATE - 1);
+            }
+
+            //to avoid stop-codon
+            /*if (prev_len_seq < 1) {
+
+            } else if ((i == M2_STATE || i == M5_STATE) &&
+                       (prev_O[prev_result->temp_i[j - I1_STATE]] == 'T' || prev_O[prev_result->temp_i[j - I1_STATE]] == 't') &&
+                       ) {
+
+            }
+            */
 
         }
     }
@@ -1557,6 +1573,11 @@ Graph read_graph(FILE *fp, FILE *fp_matr){
                     tmp_str[j] = '\0';
             strcat(res.obs_seq[i], tmp_str);
         }
+    }
+
+    for (i = 0; i < res.n_edge; ++i){
+        for (j = 0; j < strlen(res.obs_seq[i]); ++j)
+            res.obs_seq[i][j] = toupper(res.obs_seq[i][j]);
     }
 
     return res;
