@@ -200,12 +200,19 @@ int main (int argc, char **argv)
 
 
     fp = fopen(seq_file, "r");
+    if (!fp) {
+        printf("Can't open seq_file %s\n", seq_file);
+        exit(0);
+    }
+
     sprintf(tmp_str, "%s-matrix.txt", seq_file);
     fp_matr = fopen(tmp_str, "r");
     edge_num = 0;
 
-
-
+    if (!fp_matr) {
+        printf("Can't open matrix file %s\n", tmp_str);
+        exit(0);
+    }
     g = read_graph(fp, fp_matr);
 
     //cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
