@@ -124,7 +124,7 @@ typedef struct {
 int get_prob_from_cg(HMM *hmm, TRAIN *train, char *O); //return cg - 26 Ye April 16, 2016
 int get_prob_form_cg_graph(HMM *hmm_ptr, TRAIN *train_ptr, Graph *g);
 void get_train_from_file(char *filename, HMM *hmm_ptr, char *mfilename, char *mfilename1, char *nfilename, char *sfilename,char *pfilename,char *s1filename,char *p1filename, char *dfilename, TRAIN *train_ptr);
-ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result);
+ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result, char* head);
 void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,char *head, int whole_genome, int cg, int format,
                ViterbiResult *viterbi_result);
 void free_hmm(HMM *hmm);

@@ -11,7 +11,7 @@
 
 void dump_memory(void *p, int size);
 
-ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result) {
+ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result, char *head) {
 #ifdef viterbi_out_flg
     printf("Viterbi start\n");
 #endif
@@ -1439,7 +1439,9 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
   }
 #ifdef viterbi_out_flg
     printf("The Viterbi matrix was evaluated\n");
-    char *fname = "../run_result/viterbi_matrix.csv";
+    //char *fname = "../run_result/viterbi_matrix.csv";
+    char fname[4096];
+    sprintf(fname, "../run_result/with_graph/single_edge/%s-matrix.csv", head);
     FILE *f = fopen(fname, "w");
     if (!f) {
         printf("The file was not opened\n");

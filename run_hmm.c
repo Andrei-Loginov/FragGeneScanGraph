@@ -192,6 +192,11 @@ int main (int argc, char **argv)
     sprintf(tmp_str, "%s.out", out_header);
     fp_out = fopen(tmp_str, "w");
 
+    if (!fp_out) {
+        printf("Can't open out file %s\n", tmp_str);
+        exit(0);
+    }
+
     sprintf(tmp_str, "%s.faa", out_header);
     fp_aa = fopen(tmp_str, "w");
 
@@ -221,7 +226,7 @@ int main (int argc, char **argv)
         //printf("Before Viterbi call\n");
         if (g.seq_len[i] > 70) {
             cg_count = get_prob_from_cg(&hmm, &train, g.obs_seq[i]);
-            ViterbiResult res = viterbi(&hmm, g.obs_seq[i], wholegenome, NULL);
+            ViterbiResult res = viterbi(&hmm, g.obs_seq[i], wholegenome, NULL, g.head[i]);
             backtrack(&hmm, &train, fp_out, fp_aa, fp_dna, g.head[i], wholegenome, cg_count, format, &res);
             free_ViterbiResult(&res);
         }
