@@ -856,7 +856,27 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
         for (i=I1_STATE; i<=I6_STATE; i++) {
 
             if (t==0){
+                if (prev_result) {
+                    //from I state
+                    j = i;
+                    alpha[i][t] = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
+                    path[i][t] = j;
 
+                    //from M state
+                    j = i - I1_STATE + M1_STATE;
+                    if (i == I6_STATE) {
+                        temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MI] - hmm_ptr->tr_M_I[from][to];
+                    } else {
+                        temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_MI] - hmm_ptr->tr_M_I[from][to];
+                    }
+                    if (temp_alpha < alpha[i][t]){
+                        alpha[i][t] = temp_alpha;
+                        path[i][t] = j;
+
+                        temp_i[i-I1_STATE] = t-1;
+                    }
+
+                }
             }else{
 
 				/* from I state */
