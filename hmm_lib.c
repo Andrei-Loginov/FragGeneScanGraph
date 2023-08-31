@@ -1325,7 +1325,7 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
             freq_id = 0;
             double sub_sum = 0, lbound;
             int sub_count = 0;
-            if (!prev_result || t >= 30){
+            if (!prev_result /*|| t >= 30*/){
                 lbound = min(30, t);
 
                 for (i = -lbound; i <= 30; ++i){
