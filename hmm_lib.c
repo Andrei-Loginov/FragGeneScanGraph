@@ -8,6 +8,7 @@
 #include "hmm.h"
 #include "util_lib.h"
 #define viterbi_out_flg
+#define I_state_debug
 
 void dump_memory(void *p, int size);
 
@@ -878,7 +879,24 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 
                 }
             }else{
+#ifdef I_state_debug
+                if (t == 1 && head[2] == '1' && head[3] == '.' && i == I1_STATE) {
+                    printf("%s\n", head);
+                    FILE* param_f = fopen("../run_result/with_graph/single_edge/I_tr_parsmeters.txt", "w");
+                    if (!param_f) {
+                        printf("Can not open file for writing transition to Insertion state parameters\n");
+                        exit(0);
+                    }
+                    fprintf(param_f,"t = %d, i = %d\nobs. symb = %d\nfrom = %d\nto = %d\n", t, i, O[t], from, to);
+                    printf("from = %d\nto = %d\n", from, to);
+                    fprintf(param_f, "Model parameters:\n");
+                    fprintf(param_f, "TR_II = %lf\nTR_GG = %lf\nTR_MI = %lf\n", hmm_ptr->tr[TR_II], hmm_ptr->tr[TR_GG], hmm_ptr->tr[TR_MI]);
+                    fprintf(param_f, "tr_I_I[from][to] = %lf\ntr_M_I[from][to] = %lf\n", hmm_ptr->tr_I_I[from][to], hmm_ptr->tr_M_I[from][to]);
+                    fclose(param_f);
+                }
 
+
+#endif
 				/* from I state */
 				j = i;
 				alpha[i][t] = alpha[j][t-1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
@@ -900,32 +918,32 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
             }
         }
 
-    /******************/
-    /* M' state        */
-    /******************/
+        /******************/
+        /* M' state        */
+        /******************/
 
-    for (i=M1_STATE_1; i<=M6_STATE_1; i++)   {
-      if  ((i==M1_STATE_1 || i==M4_STATE_1) &&
-           ( ( t>=3 &&
-			 (((O[t-3] == 'T'||O[t-3] == 't') && (O[t-2] == 'T'||O[t-2] == 't') && (O[t-1] == 'A'||O[t-1] =='a')) ||
-				((O[t-3] == 'C'||O[t-3] == 'c') && (O[t-2] == 'T'||O[t-2] == 't') && (O[t-1] == 'A'||O[t-1] =='a')) ||
-                ((O[t-3] == 'T'||O[t-3] == 't') && (O[t-2] == 'C'||O[t-2] == 'c') && (O[t-1] == 'A'||O[t-1] =='a'))))
-           || (t == 2 && prev_O &&
-               ( (prev_O[prev_seq_len - 1] == 'T' && O[0] == 'T' && O[1] == 'A') ||
-                 (prev_O[prev_seq_len - 1] == 'C' && O[0] == 'T' && O[1] == 'A') ||
-                 (prev_O[prev_seq_len - 1] == 'T' && O[0] == 'C' && O[1] == 'A') ) )
-           || (t == 1 && prev_O &&
-               ( (prev_O[prev_seq_len - 2] == 'T' && prev_O[prev_seq_len - 1] == 'T' && O[0] == 'A') ||
-                  (prev_O[prev_seq_len - 2] == 'C' && prev_O[prev_seq_len - 1] == 'T' && O[0] == 'A') ||
-                  (prev_O[prev_seq_len - 2] == 'T' && prev_O[prev_seq_len - 1] == 'C' && O[0] == 'A') ) ) ) )  {
+        for (i=M1_STATE_1; i<=M6_STATE_1; i++)   {
+            if  ((i==M1_STATE_1 || i==M4_STATE_1) &&
+                ( ( t>=3 &&
+                    (((O[t-3] == 'T'||O[t-3] == 't') && (O[t-2] == 'T'||O[t-2] == 't') && (O[t-1] == 'A'||O[t-1] =='a')) ||
+                    ((O[t-3] == 'C'||O[t-3] == 'c') && (O[t-2] == 'T'||O[t-2] == 't') && (O[t-1] == 'A'||O[t-1] =='a')) ||
+                    ((O[t-3] == 'T'||O[t-3] == 't') && (O[t-2] == 'C'||O[t-2] == 'c') && (O[t-1] == 'A'||O[t-1] =='a'))))
+                || (t == 2 && prev_O &&
+                    ( (prev_O[prev_seq_len - 1] == 'T' && O[0] == 'T' && O[1] == 'A') ||
+                    (prev_O[prev_seq_len - 1] == 'C' && O[0] == 'T' && O[1] == 'A') ||
+                    (prev_O[prev_seq_len - 1] == 'T' && O[0] == 'C' && O[1] == 'A') ) )
+                || (t == 1 && prev_O &&
+                    ( (prev_O[prev_seq_len - 2] == 'T' && prev_O[prev_seq_len - 1] == 'T' && O[0] == 'A') ||
+                    (prev_O[prev_seq_len - 2] == 'C' && prev_O[prev_seq_len - 1] == 'T' && O[0] == 'A') ||
+                    (prev_O[prev_seq_len - 2] == 'T' && prev_O[prev_seq_len - 1] == 'C' && O[0] == 'A') ) ) ) )  {
 
 				/* from Start state  since this is actually stop codon in minus strand */
 				alpha[i][t] = alpha[S_STATE_1][t-1] - hmm_ptr->e_M_1[i-M1_STATE_1][from2][to];
 				path[i][t] = S_STATE_1;
 
-        }else{
+            }else{
 
-            if (t==0){
+                if (t==0){
 				
             }else{
 
