@@ -880,9 +880,10 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
                 }
             }else{
 #ifdef I_state_debug
+                FILE *param_f;
                 if (t == 1 && head[2] == '1' && head[3] == '.' && i == I1_STATE) {
                     printf("%s\n", head);
-                    FILE* param_f = fopen("../run_result/with_graph/single_edge/I_tr_parsmeters.txt", "w");
+                    param_f = fopen("../run_result/with_graph/single_edge/I_tr_parsmeters.txt", "w");
                     if (!param_f) {
                         printf("Can not open file for writing transition to Insertion state parameters\n");
                         exit(0);
@@ -892,9 +893,8 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
                     fprintf(param_f, "Model parameters:\n");
                     fprintf(param_f, "TR_II = %lf\nTR_GG = %lf\nTR_MI = %lf\n", hmm_ptr->tr[TR_II], hmm_ptr->tr[TR_GG], hmm_ptr->tr[TR_MI]);
                     fprintf(param_f, "tr_I_I[from][to] = %lf\ntr_M_I[from][to] = %lf\n", hmm_ptr->tr_I_I[from][to], hmm_ptr->tr_M_I[from][to]);
-                    fclose(param_f);
+                    //fclose(param_f);
                 }
-
 
 #endif
 				/* from I state */
@@ -909,6 +909,13 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 				}else{
 					temp_alpha = alpha[j][t-1]  - hmm_ptr->tr[TR_MI] - hmm_ptr->tr_M_I[from][to];
 				}
+#ifdef I_state_debug
+                if (t == 1 && head[2] == '1' && head[3] == '.' && i == I1_STATE) {
+                    fprintf(param_f, "i = %d, j = %d, temp_alpha = %lf\n", i, i, alpha[i][t]);
+                    fprintf(param_f, "i = %d, j = %d, temp_alpha = %lf\n", i, j, temp_alpha);
+                    fclose(param_f);
+                }
+#endif
 				if (temp_alpha < alpha[i][t]){
 					alpha[i][t] = temp_alpha;
 					path[i][t] = j;
