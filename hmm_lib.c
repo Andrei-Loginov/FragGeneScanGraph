@@ -913,7 +913,7 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
                 if (t == 1 && head[2] == '1' && head[3] == '.' && i == I1_STATE) {
                     fprintf(param_f, "i = %d, j = %d, temp_alpha = %lf\n", i, i, alpha[i][t]);
                     fprintf(param_f, "i = %d, j = %d, temp_alpha = %lf\n", i, j, temp_alpha);
-                    fclose(param_f);
+                    //fclose(param_f);
                 }
 #endif
 				if (temp_alpha < alpha[i][t]){
@@ -921,6 +921,12 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 					path[i][t] = j;
 
 					temp_i[i-I1_STATE] = t-1;
+#ifdef I_state_debug
+                if (t == 1 && head[2] == '1' && head[3] == '.' && i == I1_STATE) {
+                    fprintf(param_f, "alpha = %lf, path = %d", alpha[i][1], path[i][1]);
+                    fclose(param_f);
+                }
+#endif
 				}
             }
         }
