@@ -10,6 +10,7 @@
 #define viterbi_out_flg
 //#define I_state_debug
 //#define I1_state_debug
+#define E_state_debug
 
 void dump_memory(void *p, int size);
 
@@ -1265,7 +1266,19 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
             }else if (p_kd>0.99){
                 p_kd=0.99;
             }
+#ifdef E_state_debug
+            if (t == 71) {
+                FILE* param_f = fopen("../run_result/with_graph/single_edge/E_parsmeters.txt", "w");
+                fprintf(param_f, "alpha before correction = %lf\n", alpha[E_STATE][t + 2]);
+                fprintf(param_f, "h_kd = %lf\npr_kd = %lf\np_kd = %lf\n", h_kd, r_kd, p_kd);
+                fclose(param_f);
+            }
+#endif
             alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log(p_kd);
+            //if (head[2] == '1' && head[3] == '.'){
+            //    printf("t = %d, alpha[E_STATE][t + 2] = %lf\n", t, alpha[E_STATE][t + 2]);
+            //}
+            //t = 71
         }
     }
 
