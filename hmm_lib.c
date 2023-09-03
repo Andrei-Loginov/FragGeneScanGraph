@@ -8,7 +8,8 @@
 #include "hmm.h"
 #include "util_lib.h"
 #define viterbi_out_flg
-#define I_state_debug
+//#define I_state_debug
+//#define I1_state_debug
 
 void dump_memory(void *p, int size);
 
@@ -921,13 +922,14 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 					path[i][t] = j;
 
 					temp_i[i-I1_STATE] = t-1;
+                }
 #ifdef I_state_debug
                 if (t == 1 && head[2] == '1' && head[3] == '.' && i == I1_STATE) {
-                    fprintf(param_f, "alpha = %lf, path = %d", alpha[i][1], path[i][1]);
+                    fprintf(param_f, "alpha = %lf, path = %d", alpha[i][t], path[i][t]);
                     fclose(param_f);
                 }
 #endif
-				}
+
             }
         }
 
