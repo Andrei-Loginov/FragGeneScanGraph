@@ -1261,11 +1261,6 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
             h_kd = hmm_ptr->E_dist[2] * exp(-1*pow(start_freq-hmm_ptr->E_dist[1],2)/(2*pow(hmm_ptr->E_dist[0],2)));
             r_kd = hmm_ptr->E_dist[5] * exp(-1*pow(start_freq-hmm_ptr->E_dist[4],2)/(2*pow(hmm_ptr->E_dist[3],2)));
             p_kd = h_kd / (h_kd + r_kd);
-            if (p_kd<0.01){
-                p_kd=0.01;
-            }else if (p_kd>0.99){
-                p_kd=0.99;
-            }
 #ifdef E_state_debug
             if (t == 71) {
                 FILE* param_f = fopen("../run_result/with_graph/single_edge/E_parsmeters.txt", "w");
@@ -1274,6 +1269,11 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
                 fclose(param_f);
             }
 #endif
+            if (p_kd<0.01){
+                p_kd=0.01;
+            }else if (p_kd>0.99){
+                p_kd=0.99;
+            }
             alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log(p_kd);
             //if (head[2] == '1' && head[3] == '.'){
             //    printf("t = %d, alpha[E_STATE][t + 2] = %lf\n", t, alpha[E_STATE][t + 2]);
