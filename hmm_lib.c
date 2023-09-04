@@ -1245,6 +1245,14 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
                         sub_sum += hmm_ptr->tr_E[i+60][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
                     }
                 }
+#ifdef E_state_debug
+
+                if (t == 71) {
+                    FILE* param_f = fopen("../run_result/with_graph/single_edge/E_parsmeters.txt", "w");
+                    fprintf(param_f, "sub_sum = %lf\nstart_freq = %lf\n", sub_sum, sub_sum * 58.0 / (lbound - 2));
+                    fclose(param_f);
+                }
+#endif
                 sub_sum  *=  58.0 / (lbound - 2);
                 start_freq -= sub_sum;
             } else  if (prev_result){
@@ -1263,7 +1271,7 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
             p_kd = h_kd / (h_kd + r_kd);
 #ifdef E_state_debug
             if (t == 71) {
-                FILE* param_f = fopen("../run_result/with_graph/single_edge/E_parsmeters.txt", "w");
+                FILE* param_f = fopen("../run_result/with_graph/single_edge/E_parsmeters.txt", "a");
                 fprintf(param_f, "alpha before correction = %lf\n", alpha[E_STATE][t + 2]);
                 fprintf(param_f, "h_kd = %lf\npr_kd = %lf\np_kd = %lf\n", h_kd, r_kd, p_kd);
                 fclose(param_f);
