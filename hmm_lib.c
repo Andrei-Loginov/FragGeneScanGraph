@@ -1272,6 +1272,8 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 #ifdef E_state_debug
             if (t == 71) {
                 FILE* param_f = fopen("../run_result/with_graph/single_edge/E_parsmeters.txt", "a");
+                fprintf(param_f, "E_dist[2] = %lf\nE_dist[1] = %lf\nE_dist[0] = %lf\n", hmm_ptr->E_dist[2], hmm_ptr->E_dist[1], hmm_ptr->E_dist[0]);
+                fprintf(param_f, "E_dist[5] = %lf\nE_dist[4] = %lf\nE_dist[3] = %lf\n", hmm_ptr->E_dist[5], hmm_ptr->E_dist[4], hmm_ptr->E_dist[3]);
                 fprintf(param_f, "alpha before correction = %lf\n", alpha[E_STATE][t + 2]);
                 fprintf(param_f, "h_kd = %lf\npr_kd = %lf\np_kd = %lf\n", h_kd, r_kd, p_kd);
                 fclose(param_f);
