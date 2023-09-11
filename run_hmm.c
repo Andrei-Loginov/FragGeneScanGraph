@@ -12,6 +12,8 @@
 #define ADD_LEN 1024
 #define STRINGLEN 4096
 
+#define graph_check
+
 typedef struct thread_data
 {
     FILE *out;
@@ -219,17 +221,28 @@ int main (int argc, char **argv)
         exit(0);
     }
     g = read_graph(fp, fp_matr);
+    ViterbiResult* results = (ViterbiResult*)malloc(g.n_edge * sizeof(ViterbiResult));
 
-    //cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
-
+#ifdef graph_check
+    cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
+    printf("cg_count = %d\n", cg_count);
+    results[0] = viterbi(&hmm, g.obs_seq[0], wholegenome, NULL, g.head[0]);
+    results[1] = viterbi(&hmm, g.obs_seq[1], wholegenome, &(results[0]), g.head[1]);
+#else
     for (i = 0; i < g.n_edge; ++i){
         //printf("Before Viterbi call\n");
         if (g.seq_len[i] > 70) {
             cg_count = get_prob_from_cg(&hmm, &train, g.obs_seq[i]);
-            ViterbiResult res = viterbi(&hmm, g.obs_seq[i], wholegenome, NULL, g.head[i]);
-            backtrack(&hmm, &train, fp_out, fp_aa, fp_dna, g.head[i], wholegenome, cg_count, format, &res);
-            free_ViterbiResult(&res);
+            printf("i = %d, cg_count = %d\n", i, cg_count);
+            results[i] = viterbi(&hmm, g.obs_seq[i], wholegenome, NULL, g.head[i]);
+            //backtrack(&hmm, &train, fp_out, fp_aa, fp_dna, g.head[i], wholegenome, cg_count, format, &results[i]);
+            //free_ViterbiResult(&res);
         }
+    }
+#endif
+
+    for (i = 0; i < g.n_edge; ++i){
+        free_ViterbiResult(&results[i]);
     }
 
     free_graph(&g);

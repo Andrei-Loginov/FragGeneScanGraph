@@ -10,7 +10,7 @@
 #define viterbi_out_flg
 //#define I_state_debug
 //#define I1_state_debug
-#define E_state_debug
+//#define E_state_debug
 
 void dump_memory(void *p, int size);
 
@@ -1924,6 +1924,7 @@ int get_prob_form_cg_graph(HMM *hmm_ptr, TRAIN *train_ptr, Graph *g){
     int i, j;
     for (i = 0; i < g->n_edge; ++i){
         total_len += g->seq_len[i];
+        printf("i = %d, seq_len = %d\n%s\n", i, g->seq_len[i], g->obs_seq[i]);
         for (j = 0; j < g->seq_len[i]; ++j){
             if (g->obs_seq[i][j] == 'C' || g->obs_seq[i][j] =='c' || g->obs_seq[i][j] == 'G' || g->obs_seq[i][j] == 'g'){
                 ++cg_count;
@@ -2218,7 +2219,7 @@ Graph read_graph(FILE *fp, FILE *fp_matr){
         while (fgets(tmp_str, sizeof(tmp_str), fp)){
             if (tmp_str[0] == '>')
                 break;
-            res.seq_len[i] += sizeof(tmp_str);
+            res.seq_len[i] += strlen(tmp_str) - 1;
         }
         res.obs_seq[i] = (char*)malloc((res.seq_len[i] + 1) * sizeof(char));
     }
