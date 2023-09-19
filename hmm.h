@@ -127,6 +127,11 @@ void get_train_from_file(char *filename, HMM *hmm_ptr, char *mfilename, char *mf
 ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result, char* head);
 void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,char *head, int whole_genome, int cg, int format,
                ViterbiResult *viterbi_result);
+
+double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result, int whole_genome,
+                        int from, int from2, int to);
+int check_stop_codon(int t, ViterbiResult* curr_res, ViterbiResult* prev_result, int insertion);
+
 void free_hmm(HMM *hmm);
 void free_ViterbiResult(ViterbiResult *viterbi_result);
 void get_protein(char *dna, char *protein, int strand, int whole_genome);
