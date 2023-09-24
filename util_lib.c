@@ -386,6 +386,14 @@ void print_viterbi(double **matr, int len_seq, int n_state, FILE *f){
     }
 }
 
+void print_path(int **matr, int len_seq, int n_state, FILE *f){
+    for (int j = 0; j < n_state; ++j) {
+        for (int i = 0; i < len_seq; ++i)
+            fprintf(f, "%d,", matr[j][i]);
+        fprintf(f, "\n");
+    }
+}
+
 int min(int lhs, int rhs) {
     return (lhs < rhs) ? lhs : rhs;
 }

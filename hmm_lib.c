@@ -11,6 +11,7 @@
 //#define I_state_debug
 //#define I1_state_debug
 //#define E_state_debug
+//#define M_state_profiling
 
 void dump_memory(void *p, int size);
 
@@ -38,13 +39,18 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
     int freq_id;
     double h_kd, r_kd, p_kd;
 
-    int temp_i[6] = {0,0,0,0,0,0};
-    int temp_i_1[6] = {0,0,0,0,0,0};
+    int *temp_i = (int*)malloc(6 * sizeof(int));
+    int *temp_i_1 = (int*)malloc(6 * sizeof(int));
+
+    for (i = 0; i < 6; ++i){
+        temp_i[i] = 0;
+        temp_i_1[i] = 0;
+    }
 
     int num_N=0;
     ViterbiResult res;
 
-    char *prev_O;
+    char *prev_O = NULL;
 
 
     /***************************************************************/
@@ -68,8 +74,16 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 
     res.O = (char*)malloc(len_seq + 1 * sizeof(char));
     res.O = strcpy(res.O, O);
+    res.len_seq = len_seq;
+    res.temp_i = temp_i;;
+    res.temp_i_1 = temp_i_1;
+
+    temp_i = res.temp_i;
+    temp_i_1 = res.temp_i;
 
     if (!prev_result) {
+        time_t init_start;
+        time(&init_start);
         for (i=0; i<hmm_ptr->N; ++i){
             alpha[i][0] = -1 * hmm_ptr->pi[i];
         }
@@ -124,6 +138,11 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
                 alpha[S_STATE_1][2] = alpha[S_STATE_1][2] - log30;
             }
         }
+        time_t init_end;
+        time(&init_end);
+        FILE *f2 = fopen("init_time.txt", "w");
+        fprintf(f2, "%f\n", difftime(init_end, init_start));
+        fclose(f2);
     } else {
         prev_seq_len = (!prev_result) ? 0 : strlen(prev_result->O);
         prev_O = prev_result->O;
@@ -724,132 +743,9 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
         /******************/
         /* M state        */
         /******************/
-
         for (i = M1_STATE; i <= M6_STATE; i++) {
-
-            if (alpha[i][t]<max_dbl){
-
-				if (t == 0){
-                    //watch higher
-				}else{
-					if (i == M1_STATE){ //i == 5
-
-						/* from M state */
-						j = M6_STATE;
-						alpha[i][t] = alpha[j][t-1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to]; // 0 = M1_STATE - M1_STATE
-						path[i][t] = j;
-
-						/* from D state */
-						if (whole_genome==0){ // if !whole genome, then transition to M1 is possible from any state through Deletions.  
-							for (j = M5_STATE; j >= M1_STATE; j--){ 
-								if (j >= i ){
-									num_d = i - j + 6; // Если добавлять 6, то получается число пропусков + 1. Пусть j = M5_state = 9, тогда i - j + 6 = 2, хотя у нас всего один пропуск: M5 -> D6 -> M1. Далее это корректируется вычитанием. 
-								}else if (j + 1 < i){ // Условие --- бред. Здесь j >= i, по условию в цикле for, т.к. i = M1_STATE. Зачем этот забор из if? 
-									num_d = i - j;
-								}else{
-                                    num_d = -10; //Что это за костыль вообще? Почему не 15, не 25?
-								}
-								if(num_d > 0){ // num_d > 0 for any j in this loop. 
-									temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[0][from2][to]    // 0 = M1_STATE - M1_STATE
-										- log25*(num_d-1) - hmm_ptr->tr[TR_DD]*(num_d-2) - hmm_ptr->tr[TR_DM]; //What does log25 mean? | 
-									if ( temp_alpha < alpha[i][t]){
-										alpha[i][t] = temp_alpha;
-										path[i][t] = j;
-									}
-								}
-							}
-						}
-
-						/* from Start state */
-						temp_alpha = alpha[S_STATE][t-1] - hmm_ptr->e_M[0][from2][to];
-						if ( temp_alpha < alpha[i][t] ){
-							alpha[i][t] = temp_alpha;
-							path[i][t] = S_STATE;
-						}
-
-					} else {   /*i == M2-M6*/
-
-						/* from M state */
-						j = i - 1;
-						alpha[i][t] = alpha[j][t-1] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i-M1_STATE][from2][to];
-						path[i][t] = j;
-
-
-						/* from D state */
-						if (whole_genome == 0){
-							for (j = M6_STATE; j >= M1_STATE; j--){
-								if (j >= i ){
-									num_d = i-j+6;
-								}else if (j+1 < i){ // j <= i - 1 
-									num_d = i-j;
-								}else{
-									num_d = -10;
-								}
-								if (num_d > 0){
-
-									temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[i-M1_STATE][from2][to]
-											- log25*(num_d-1) - hmm_ptr->tr[TR_DD]*(num_d-2) - hmm_ptr->tr[TR_DM];
-									if ( temp_alpha < alpha[i][t]){
-										alpha[i][t] = temp_alpha;
-										path[i][t] = j;
-									}
-								}
-							}
-						}
-					}
-
-					/* from I state */
-					if (i==M1_STATE) { 
-						j = I6_STATE;
-					}else{ 
-							j = I1_STATE + (i - M1_STATE -1); 
-					}
-
-                    /* to aviod stop codon */
-
-					if (t<2){
-                        //t = 1
-                        if (prev_result) {
-                            if ((i == M2_STATE || i == M5_STATE) &&
-                                prev_O[-temp_i[j - I1_STATE]] == 'T' &&
-                                ( (O[1] == 'A' && O[2] == 'A') ||
-                                  (O[1] == 'A' && O[2] == 'G') ||
-                                  (O[1] == 'G' && O[2] == 'A') )) {
-
-                            } else if ((i == M3_STATE || i == M6_STATE) &&
-                                       prev_O[-temp_i[j - I1_STATE] + 1] == 'T' &&
-                                       ( (prev_O[-temp_i[j - I1_STATE]] == 'A' && O[1] == 'A') ||
-                                         (prev_O[-temp_i[j - I1_STATE]] == 'A' && O[1] == 'G') ||
-                                         (prev_O[-temp_i[j - I1_STATE]] == 'G' && O[1] == 'A') )) {
-
-                            } else {
-                                temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_IM] - log25;
-                                if (temp_alpha < alpha[i][t]) {
-                                    alpha[i][t] = temp_alpha;
-                                    path[i][t] = j;
-                                }
-                            }
-                        }
-
-					}else if((i==M2_STATE || i==M5_STATE) && (O[temp_i[j-I1_STATE]] == 'T'||O[temp_i[j-I1_STATE]] =='t') &&
-                         (( O[t] == 'A' && O[t+1] =='A') ||
-                            (O[t] == 'A' && O[t+1] =='G') ||
-                            (O[t] == 'G' && O[t+1] =='A'))){
-
-                    }else if ( temp_i[j - I1_STATE] < 1 ||
-                     ((i==M3_STATE || i==M6_STATE) && (O[temp_i[j-I1_STATE]-1] == 'T'||O[temp_i[j-I1_STATE]-1] =='t') &&
-                     (((O[temp_i[j-I1_STATE]] == 'A'||O[temp_i[j-I1_STATE]] == 'a') && (O[t] =='A'||O[t] == 'a')) ||
-                        ((O[temp_i[j-I1_STATE]] == 'A'||O[temp_i[j-I1_STATE]] == 'a') && (O[t] =='G'||O[t] == 'g')) ||
-                        ((O[temp_i[j-I1_STATE]] == 'G'||O[temp_i[j-I1_STATE]] == 'g') && (O[t] =='A'||O[t] == 'a'))))){
-
-					}else{
-						temp_alpha = alpha[j][t-1]  - hmm_ptr->tr[TR_IM] - log25;
-						if ( temp_alpha < alpha[i][t]){
-							alpha[i][t] = temp_alpha;
-							path[i][t] = j;
-						}
-                    }
-				}
+            if (alpha[i][t] < max_dbl){
+                alpha[i][t] = match_state_prob_evaluation(t, i, hmm_ptr, &res, prev_result, whole_genome, from, from2, to);
             }
         }
 
@@ -1523,8 +1419,16 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
     if (!f) {
         printf("The file was not opened\n");
     }
+    sprintf(fname, "../run_result/with_graph/single_edge/%s-path.csv", head);
     print_viterbi(alpha, len_seq, NUM_STATE, f);
     fclose(f);
+
+    FILE *f_path = fopen(fname, "w");
+    if(!f_path) {
+        printf("Path file was not opened\n");
+    }
+    print_path(path, len_seq, NUM_STATE, f_path);
+    fclose(f_path);
 #endif
     res.alpha = alpha;
     res.path = path;
@@ -2275,60 +2179,41 @@ void free_graph(Graph *g){
 
 double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result, int whole_genome,
                         int from, int from2, int to) {
+#ifdef M_state_profiling
+    FILE *time_f = fopen("m_time.txt", "a");
+    time_t start_t, end_t, mid_t, del_t;
+    time(&start_t);
+#endif
     double max_dbl = 10000000000.0;
     double ans, temp_alpha;
     int j, tmp_path, num_d;
-    char* O = curr_res->O;
-    if (!prev_result) { //there is not prev. edge
-        if (t == 0) {
-            curr_res->alpha[i][0] = -1 * hmm_ptr->pi[i];
-            return curr_res->alpha[i][0];
-        }
-        /// t > 0
+    double **alpha = curr_res->alpha, **prev_alpha = (!prev_result) ? NULL : prev_result->alpha;
+    char* O = curr_res->O, *prev_O = (!prev_result) ? NULL : prev_result->O;
+    int **path = curr_res->path;
+    int *temp_i = curr_res->temp_i, prev_temp_i = (!prev_result) ? NULL : prev_result->temp_i;
+
+    if (!prev_result && t == 0){
+        alpha[i][0] = -hmm_ptr->pi[i];
+#ifdef M_state_profiling
+        time(&end_t);
+        fprintf(time_f, "t = %d, i = %d, duration = %f\n", t, i, difftime(end_t, start_t));
+        fclose(time_f);
+#endif
+        return alpha[i][0];
+    }
+    if (!prev_result && t > 0){
         if (i == M1_STATE) {
             //from M
             j = M6_STATE;
-            ans = curr_res->alpha[j][t-1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to];
+            ans = alpha[j][t - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to];
             tmp_path = j;
+
             //from D
             if (whole_genome == 0) {
                 for (j = M5_STATE; j>= M1_STATE; --j){
                     num_d = i - j + 6;
-                }
-                temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[0][from2][to] -
-                        log(0.25) * (num_d-1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
-                if (temp_alpha < ans) {
-                    ans = temp_alpha;
-                    tmp_path = j;
-                }
-            }
-            //from S
-            temp_alpha = curr_res->alpha[S_STATE][t - 1] - hmm_ptr->e_M[0][from2][to];
-            if (temp_alpha < ans) {
-                ans = temp_alpha;
-                tmp_path = S_STATE;
-            }
-            curr_res->path[i][t] = tmp_path;
-            curr_res->alpha[i][t] = ans;
-            return curr_res->alpha[i][t];
-        }
-        ///i = M2, ... M6
-        //from M
-        j = i - 1;
-        ans = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i - M1_STATE][from2][to];
-        tmp_path = j;
-        //from D
-        if (whole_genome == 0) {
-            for (j = M6_STATE; j >= M1_STATE; ++j) {
-                if (j >= i) {
-                    num_d = i - j + 6;
-                } else if (j + 1 < i) {
-                    num_d = i - j;
-                } else {
-                    num_d = -10;
-                }
-                if (num_d > 0) {
-                    temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[i - M1_STATE][from2][to] -
+
+                    temp_alpha = alpha[j][t - 1] -hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[0][from2][to] -
                             log(0.25) * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
                     if (temp_alpha < ans) {
                         ans = temp_alpha;
@@ -2336,35 +2221,90 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
                     }
                 }
             }
-        }
-        //from I
-        j = (i == M1_STATE) ? I6_STATE : I1_STATE + (i - M1_STATE - 1);
-        if (t < 2) {
-            if ((i == M2_STATE || i == M5_STATE) && (curr_res->O[curr_res->temp_i[j - I1_STATE]] == 'T') &&
-                    ((curr_res->O[t] == 'A' && curr_res->O[t + 1] == 'A') ||
-                     (curr_res->O[t] == 'A' && curr_res->O[t + 1] == 'G') ||
-                     (curr_res->O[t] == 'G' && curr_res->O[t + 1] == 'A'))) {
 
-            } else if ((i == M3_STATE || i == M6_STATE) && curr_res->temp_i[j - I1_STATE] > 0 &&
-                       curr_res->O[curr_res->temp_i[j - I1_STATE] - 1] == 'T' &&
-                       ( (curr_res->O[curr_res->temp_i[j - I1_STATE]] == 'A' && curr_res->O[t] == 'A') ||
-                         (curr_res->O[curr_res->temp_i[j - I1_STATE]] == 'A' && curr_res->O[t] == 'G') ||
-                         (curr_res->O[curr_res->temp_i[j - I1_STATE]] == 'G' && curr_res->O[t] == 'A') )) {
-
-            } else  {
-                temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_IM] - log(0.25);
-                if (temp_alpha < ans) {
-                    ans = temp_alpha;
-                    tmp_path = j;
+            //from S
+            temp_alpha = alpha[S_STATE][t - 1] - hmm_ptr->e_M[0][from2][to];
+            if (temp_alpha < ans) {
+                ans = temp_alpha;
+                tmp_path = S_STATE;
+            }
+            ///
+            /// Here should be considred transition from I6 to M1
+            ///
+            path[i][t] = tmp_path;
+            alpha[i][t] = ans;
+#ifdef M_state_profiling
+            time(&end_t);
+            fprintf(time_f, "prev_result is null, M1 state, t = %d, i = %d, duration = %f\n", t, i, difftime(end_t, start_t));
+            fclose(time_f);
+#endif
+            return alpha[i][t];
+        } else { //i = M2, ..., M6
+            //from M
+            j = i - 1;
+            ans = alpha[j][t - 1] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i - M1_STATE][from2][to];
+            tmp_path = j;
+#ifdef M_state_profiling
+            time(&mid_t);
+            fprintf(time_f, "t = %d, i = %d, time after M = %f\n", t, i, difftime(mid_t, start_t));
+#endif
+            //from D
+            if (whole_genome == 0) {
+                for (j = M6_STATE; j >= M1_STATE; --j) {
+                    if (j >= i) {
+                        num_d = i - j + 6;
+                    } else if (j + 1 < i) {
+                        num_d = i - j;
+                    } else {
+                        num_d = -10;
+                    }
+                    if (num_d > 0) {
+                        temp_alpha = alpha[j][t - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[i - M1_STATE][from2][to] -
+                                log(0.25) * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
+                        if (temp_alpha < ans) {
+                            ans = temp_alpha;
+                            tmp_path = j;
+                        }
+                    }
                 }
             }
+#ifdef M_state_profiling
+            time(&mid_t);
+            fprintf(time_f, "t = %d, i = %d, time after D = %f\n", t, i, difftime(mid_t, start_t));
+#endif
+            //from I
+            j = I1_STATE + (i - M1_STATE - 1);
+            if (t < 2) {
+                if ((i == M2_STATE || i == M5_STATE) && (O[temp_i[j - I1_STATE]] == 'T') &&
+                        ((O[t] == 'A' && O[t + 1] == 'A') ||
+                         (O[t] == 'A' && O[t + 1] == 'G') ||
+                         (O[t] == 'G' && O[t + 1] == 'A'))) {
+
+                } else if ((i == M3_STATE || i == M6_STATE) && temp_i[j - I1_STATE] > 0 &&
+                           O[temp_i[j - I1_STATE] - 1] == 'T' &&
+                           ( (O[temp_i[j - I1_STATE]] == 'A' && O[t] == 'A') ||
+                             (O[temp_i[j - I1_STATE]] == 'A' && O[t] == 'G') ||
+                             (O[temp_i[j - I1_STATE]] == 'G' && O[t] == 'A') )) {
+
+                } else  {
+                    temp_alpha = alpha[j][t - 1] - hmm_ptr->tr[TR_IM] - log(0.25);
+                    if (temp_alpha < ans) {
+                        ans = temp_alpha;
+                        tmp_path = j;
+                    }
+                }
+            }
+            path[i][t] = tmp_path;
+            alpha[i][t] = ans;
+#ifdef M_state_profiling
+            time(&end_t);
+            fprintf(time_f, "prev is null, i != M1; t = %d, i = %d, duration = %f\n", t, i, difftime(end_t, start_t));
+            fclose(time_f);
+#endif
+            return alpha[i][t];
         }
-        curr_res->path[i][t] = tmp_path;
-        curr_res->alpha[i][t] = ans;
-        return curr_res->alpha[i][t];
     }
-    ///prev_result is not null
-    if (t == 0) {
+    if (prev_result && t == 0){
         int prev_seq_len = prev_result->len_seq;
         if (i == M1_STATE) {
             //from M
@@ -2399,6 +2339,11 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
 
             curr_res->alpha[M1_STATE][0] = ans;
             curr_res->path[M1_STATE][0] = tmp_path;
+#ifdef M_state_profiling
+            time(&end_t);
+            fprintf(time_f, "t = %d, i = %d, duration = %f\n", t, i, difftime(end_t, start_t));
+            fclose(time_f);
+#endif
             return ans;
         }
         /// i = M2, ..., M6
@@ -2442,90 +2387,108 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
         }
         curr_res->path[i][0] = tmp_path;
         curr_res->alpha[i][0] = ans;
+#ifdef M_state_profiling
+        time(&end_t);
+        fprintf(time_f, "t = %d, i = %d, duration = %f\n", t, i, difftime(end_t, start_t));
+        fclose(time_f);
+#endif
         return ans;
     }
-    /// prev_result is not null; t > 0
-    if (i == M1_STATE) {
-        //from M
-        j = M6_STATE;
-        ans = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to];
-        tmp_path = j;
-
-        //from D
-        if (!whole_genome) {
-            for (j = M5_STATE; j >= M1_STATE; --j){
-                num_d = i - j + 6;
-                temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[0][from2][to] -
-                        (num_d - 1) * log(0.25) - (num_d - 2) * hmm_ptr->tr[TR_DD] - hmm_ptr->tr[TR_DM];
-                if (temp_alpha < ans) {
-                    ans = temp_alpha;
-                    tmp_path = j;
-                }
-            }
-        }
-        //from S
-        j = S_STATE;
-        temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->e_M[0][from2][to];
-        if (temp_alpha < ans) {
-            ans = temp_alpha;
+    if (prev_result && t > 0){
+        if (i == M1_STATE) {
+            //from M
+            j = M6_STATE;
+            ans = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to];
             tmp_path = j;
-        }
-        ///
-        ///Here transition from I6 to M1 must be considered
-        ///
-        curr_res->alpha[i][t] = ans;
-        curr_res->path[i][t] = tmp_path;
-        return ans;
-    }
-    ///i = M2, ..., M6
-    j = i - 1;
-    ans = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i - M1_STATE][from2][to];
-    tmp_path = j;
-    //from D
-    if (whole_genome == 0) {
-        for (j = M6_STATE; j >= M1_STATE; ++j) {
-            if (j >= i) {
-                num_d = i - j + 6;
-            } else if (j + 1 < i) {
-                num_d = i - j;
-            } else {
-                num_d = -10;
-            }
-            if (num_d > 0) {
-                temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[i - M1_STATE][from2][to] -
-                        log(0.25) * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
-                if (temp_alpha < ans) {
-                    ans = temp_alpha;
-                    tmp_path = j;
+
+            //from D
+            if (!whole_genome) {
+                for (j = M5_STATE; j >= M1_STATE; --j){
+                    num_d = i - j + 6;
+                    temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[0][from2][to] -
+                            (num_d - 1) * log(0.25) - (num_d - 2) * hmm_ptr->tr[TR_DD] - hmm_ptr->tr[TR_DM];
+                    if (temp_alpha < ans) {
+                        ans = temp_alpha;
+                        tmp_path = j;
+                    }
                 }
             }
+            //from S
+            j = S_STATE;
+            temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->e_M[0][from2][to];
+            if (temp_alpha < ans) {
+                ans = temp_alpha;
+                tmp_path = j;
+            }
+            ///
+            ///Here transition from I6 to M1 must be considered
+            ///
+            curr_res->alpha[i][t] = ans;
+            curr_res->path[i][t] = tmp_path;
+#ifdef M_state_profiling
+            time(&end_t);
+            fprintf(time_f, "t = %d, i = %d, duration = %f\n", t, i, difftime(end_t, start_t));
+            fclose(time_f);
+#endif
+            return ans;
+        } else { //i = M2, ..., M6
+            j = i - 1;
+            ans = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i - M1_STATE][from2][to];
+            tmp_path = j;
+            //from D
+            if (whole_genome == 0) {
+                for (j = M6_STATE; j >= M1_STATE; ++j) {
+                    if (j >= i) {
+                        num_d = i - j + 6;
+                    } else if (j + 1 < i) {
+                        num_d = i - j;
+                    } else {
+                        num_d = -10;
+                    }
+                    if (num_d > 0) {
+                        temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[i - M1_STATE][from2][to] -
+                                log(0.25) * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
+                        if (temp_alpha < ans) {
+                            ans = temp_alpha;
+                            tmp_path = j;
+                        }
+                    }
+                }
+            }
+            //from I
+            j = I1_STATE + (i - M1_STATE - 1);
+            /// if temp_i < 0 then previous match was on previous edge, else prev. match was at current edge
+            char prev_m = (curr_res->temp_i[j - I1_STATE] > 0) ? O[curr_res->temp_i[j - I1_STATE]] : prev_result->O[-curr_res->temp_i[j - I1_STATE]];
+            char prev_m2 = (curr_res->temp_i[j - I1_STATE] > 0) ? O[curr_res->temp_i[j - I1_STATE] - 1] : prev_result->O[-curr_res->temp_i[j - I1_STATE] - 1];
+            if ((i == M2_STATE || i == M5_STATE) && (t < curr_res->len_seq - 1) && prev_m == 'T' &&
+                    ( (O[t] == 'A' && O[t + 1] == 'A') ||
+                      (O[t] == 'A' && O[t + 1] == 'G') ||
+                      (O[t] == 'G' && O[t + 1] == 'A') )) {
+
+            } else if ((i == M3_STATE || i == M6_STATE) && prev_m2 == 'T' &&
+                       ((prev_m == 'A' && O[t] == 'A') ||
+                        (prev_m == 'A' && O[t] == 'G') ||
+                        (prev_m == 'G' && O[t] == 'A')) ) {
+
+            } else {
+                temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_IM] - log(0.25);
+               if (temp_alpha < ans) {
+                   ans = temp_alpha;
+                   tmp_path = j;
+               }
+            }
+            curr_res->alpha[i][t] = ans;
+            curr_res->path[i][t] = tmp_path;
+#ifdef M_state_profiling
+            time(&end_t);
+            fprintf(time_f, "t = %d, i = %d, duration = %f\n", t, i, difftime(end_t, start_t));
+            fclose(time_f);
+#endif
+            return ans;
         }
-    }
-    //from I
-    j = I1_STATE + (i - M1_STATE - 1);
-    /// if temp_i < 0 then previous match was on previous edge, else prev. match was at current edge
-    char prev_m = (curr_res->temp_i[j - I1_STATE] > 0) ? O[curr_res->temp_i[j - I1_STATE]] : prev_result->O[-curr_res->temp_i[j - I1_STATE]];
-    char prev_m2 = (curr_res->temp_i[j - I1_STATE] > 0) ? O[curr_res->temp_i[j - I1_STATE] - 1] : prev_result->O[-curr_res->temp_i[j - I1_STATE] - 1];
-    if ((i == M2_STATE || i == M5_STATE) && (t < curr_res->len_seq - 1) && prev_m == 'T' &&
-            ( (O[t] == 'A' && O[t + 1] == 'A') ||
-              (O[t] == 'A' && O[t + 1] == 'G') ||
-              (O[t] == 'G' && O[t + 1] == 'A') )) {
 
-    } else if ((i == M3_STATE || i == M6_STATE) && prev_m2 == 'T' &&
-               ((prev_m == 'A' && O[t] == 'A') ||
-                (prev_m == 'A' && O[t] == 'G') ||
-                (prev_m == 'G' && O[t] == 'A')) ) {
-
-    } else {
-        temp_alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_IM] - log(0.25);
-       if (temp_alpha < ans) {
-           ans = temp_alpha;
-           tmp_path = j;
-       }
     }
-    curr_res->alpha[i][t] = ans;
-    curr_res->path[i][t] = tmp_path;
-    return ans;
+    return max_dbl + 1;
 }
 
 double insertion_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result,

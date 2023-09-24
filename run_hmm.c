@@ -12,7 +12,7 @@
 #define ADD_LEN 1024
 #define STRINGLEN 4096
 
-#define graph_check
+//#define graph_check
 
 typedef struct thread_data
 {
