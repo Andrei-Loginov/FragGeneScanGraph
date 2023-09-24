@@ -1419,10 +1419,10 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
     if (!f) {
         printf("The file was not opened\n");
     }
-    sprintf(fname, "../run_result/with_graph/single_edge/%s-path.csv", head);
     print_viterbi(alpha, len_seq, NUM_STATE, f);
     fclose(f);
 
+    sprintf(fname, "../run_result/with_graph/single_edge/%s-path.csv", head);
     FILE *f_path = fopen(fname, "w");
     if(!f_path) {
         printf("Path file was not opened\n");
