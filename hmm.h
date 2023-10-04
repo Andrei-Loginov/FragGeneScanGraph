@@ -132,6 +132,8 @@ void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *
 double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result, int whole_genome,
                         int from, int from2, int to);
 double insertion_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result, int from, int from2, int to);
+double non_coding_state_prob_evaluation(int t, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result, int from, int to);
+double end_state_prob_evaluation(int t, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result);
 int check_stop_codon(int t, ViterbiResult* curr_res, ViterbiResult* prev_result, int insertion);
 
 void free_hmm(HMM *hmm);
