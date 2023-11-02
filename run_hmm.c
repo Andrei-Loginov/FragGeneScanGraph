@@ -12,7 +12,7 @@
 #define ADD_LEN 1024
 #define STRINGLEN 4096
 
-//#define graph_check
+#define graph_check
 
 typedef struct thread_data
 {
@@ -225,6 +225,9 @@ int main (int argc, char **argv)
 
 #ifdef graph_check
     cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
+    FILE *ff = fopen("some_file.txt", "w");
+    fprintf(ff, "cg_count = %d\n", cg_count);
+    fclose(ff);
     printf("cg_count = %d\n", cg_count);
     results[0] = viterbi(&hmm, g.obs_seq[0], wholegenome, NULL, g.head[0]);
     results[1] = viterbi(&hmm, g.obs_seq[1], wholegenome, &(results[0]), g.head[1]);

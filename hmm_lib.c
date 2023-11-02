@@ -12,6 +12,11 @@
 //#define I1_state_debug
 //#define E_state_debug
 //#define M_state_profiling
+//#define profiling
+//#define M_state_debug
+//#define R_state_debug
+//#define match_vertex
+#define I1_debug
 
 void dump_memory(void *p, int size);
 
@@ -140,8 +145,8 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
         prev_seq_len = (!prev_result) ? 0 : strlen(prev_result->O);
         prev_O = prev_result->O;
 
-        from = prev_O[prev_seq_len - 1];
-        from0 = prev_O[prev_seq_len - 2];
+        from = nt2int(prev_O[prev_seq_len - 1]);
+        from0 = nt2int(prev_O[prev_seq_len - 2]);
         to = nt2int(O[0]);
 
         if (from==4){ from=2; } //Why do we change other nt to G? G is 2 according to defines and nt2int.
@@ -154,12 +159,26 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
         }
         from2 = from0 * 4 + from;
 
+        for (i = 0; i < 6; ++i){
+            temp_i[i] = -prev_result->temp_i[i];
+            temp_i_1[i] = -prev_result->temp_i_1[i];
+        }
+
         /*
          * M state
          */
+#ifdef match_vertex
+    FILE *m_vert_f = fopen("match_vertex.txt", "w");
+#endif
         for (i = M1_STATE; i <= M6_STATE; ++i){
             alpha[i][0] = match_state_prob_evaluation(0, i, hmm_ptr, &res, prev_result, whole_genome, from, from2, to);
+#ifdef match_vertex
+    fprintf(m_vert_f, "i = %d, alpha = %lf, path = %d\n", i, alpha[i][0], path[i][0]);
+#endif
         }
+#ifdef match_vertex
+    fclose(m_vert_f);
+#endif
 
         ///
         /// I state
@@ -171,234 +190,26 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
         ///
         /// M' state
         ///
-
-        for (i = M1_STATE_1; i <= M6_STATE_1; ++i) {
-            if ((i == M1_STATE_1 || i == M4_STATE_1) && (prev_seq_len >= 3) &&
-                ( (prev_O[prev_seq_len - 3] == 'T' && prev_O[prev_seq_len - 2] == 'T' && prev_O[prev_seq_len - 1] == 'A') ||
-                   (prev_O[prev_seq_len - 3] == 'C' && prev_O[prev_seq_len - 2] == 'T' && prev_O[prev_seq_len - 1] == 'A') ||
-                   (prev_O[prev_seq_len - 3] == 'T' && prev_O[prev_seq_len - 2] == 'C' && prev_O[prev_seq_len - 1] == 'A'))) {
-                /* from Start state  since this is actually stop codon in minus strand */
-                alpha[i][0] = prev_result->alpha[i][prev_seq_len - 1] - hmm_ptr->e_M_1[i-M1_STATE_1][from2][to];
-                path[i][0] = S_STATE_1;
-            } else {
-
-                if (i == M1_STATE_1){
-                    //from M state
-                    j = M6_STATE_1;
-                    alpha[i][0] = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M_1[0][from2][to];
-                    path[i][0] = j;
-
-                ///
-                ///from D state
-                ///
-                    if (whole_genome == 0){
-                        for (j = M5_STATE_1; j >= M1_STATE_1; --j){
-                            if (j >= i){
-                                num_d = i - j + 6;
-                            } else if (j + 1 < i){
-                                num_d = i - j;
-                            } else {
-                                num_d = -10;
-                            }
-                            if (num_d > 0) {
-                                temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M_1[0][from2][to] -
-                                        log25 * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
-                                if (temp_alpha < alpha[i][0]) {
-                                    alpha[i][0] = temp_alpha;
-                                    path[i][0] = j;
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    //from M state
-                    j = i - 1;
-                    alpha[i][0] = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M_1[0][from2][to];
-                    path[i][0] = j;
-
-                    ///
-                    /// from D state
-                    ///
-                    if (whole_genome == 0){
-                        for (j = M6_STATE_1; j <= M1_STATE_1; --j){
-                            if (j >= i){
-                                num_d = i - j + 6;
-                            } else if (j + 1 < i) {
-                                num_d = i - j;
-                            } else {
-                                num_d = -10;
-                            }
-                            if (num_d > 0) {
-                                temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M_1[i - M1_STATE_1][from2][to] -
-                                        log25 * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
-                                if (temp_alpha < alpha[i][0]) {
-                                    alpha[i][0] = temp_alpha;
-                                    path[i][0] = j;
-                                }
-                            }
-                        }
-                    }
-                }
-                ///
-                ///from I state
-                ///
-                if (i == M1_STATE_1) {
-                    j = I6_STATE_1;
-                } else {
-                    j = I1_STATE_1 + (i - M1_STATE_1 - 1);
-                }
-
-                //to avoid stop-codon
-                if (prev_seq_len < 1) {
-
-                } else if ((i == M2_STATE_1 || i == M5_STATE_1) && O[1] == 'A' &&
-                           ( (prev_O[prev_result->temp_i_1[j - I1_STATE_1]] == 'T' && O[0] == 'T') ||
-                             (prev_O[prev_result->temp_i_1[j - I1_STATE_1]] == 'C' && O[0] == 'T') ||
-                              (prev_O[prev_result->temp_i_1[j - I1_STATE_1]] == 'T' && O[0] == 'C') ) ) {
-
-                } else if ((i == M3_STATE_1 || i == M6_STATE_1) &&
-                           prev_result->temp_i[j - I1_STATE_1] > 0 && O[0] == 'A' &&
-                           ( ( prev_O[prev_result->temp_i_1[j - I1_STATE_1] - 1] == 'T' && prev_O[prev_result->temp_i_1[j - I1_STATE_1]] == 'T') ||
-                             ( prev_O[prev_result->temp_i_1[j - I1_STATE_1] - 1] == 'C' && prev_O[prev_result->temp_i_1[j - I1_STATE_1]] == 'T') ||
-                             ( prev_O[prev_result->temp_i_1[j - I1_STATE_1] - 1] == 'T' && prev_O[prev_result->temp_i_1[j - I1_STATE_1]] == 'C') ) ){
-
-                } else {
-                    temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_IM] - log25;
-                    if (temp_alpha < alpha[i][0]) {
-                        alpha[i][0] = temp_alpha;
-                        path[i][0] = j;
-                    }
-                }
-            }
+        for (i = M1_STATE_1; i <= M6_STATE_1; ++i){
+            alpha[i][0] = match1_state_prob_evaluation(0, i, hmm_ptr, &res, prev_result, whole_genome, from, from2, to);
         }
-
         ///
         /// I' state
         ///
         for (i = I1_STATE_1; i <= I6_STATE_1; ++i){
-            ///
-            ///From I state
-            ///
-            j = i;
-            alpha[i][0] = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
-            path[i][0] = j;
-            ///
-            ///From M state
-            ///
-            if (prev_seq_len > 5 &&
-                prev_result->path[S_STATE_1][prev_seq_len - 3] != R_STATE &&
-                prev_result->path[S_STATE_1][prev_seq_len - 4] != R_STATE &&
-                prev_result->path[S_STATE_1][prev_seq_len - 5] != R_STATE) {
-
-                j = i - I1_STATE_1 + M1_STATE_1;
-                if (i == I6_STATE_1) {
-                    temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MI] - hmm_ptr->tr_M_I[from][to];
-                } else {
-                    temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_MI] - hmm_ptr->tr_M_I[from][to];
-                }
-                if (temp_alpha < alpha[i][0]) {
-                    alpha[i][0] = temp_alpha;
-                    path[i][0] = j;
-
-                    temp_i_1[i - I1_STATE_1] = -(prev_seq_len - 1);
-                }
-            }
+            alpha[i][0] = insertion1_state_prob_evaluation(0, i, hmm_ptr, &res, prev_result, from, from2, to);
         }
 
         ///
         ///Non-coding state
         ///
-        //from R_state
-        alpha[R_STATE][0] = prev_result->alpha[R_STATE][prev_seq_len - 1] - hmm_ptr->tr_R_R[from][to] - hmm_ptr->tr[TR_RR];
-        path[R_STATE][0] = R_STATE;
 
-        //from E state
-        temp_alpha = prev_result->alpha[E_STATE][prev_seq_len - 1] - hmm_ptr->tr[TR_ER];
-        if (temp_alpha < alpha[R_STATE][0]){
-            alpha[R_STATE][0] = temp_alpha;
-            path[R_STATE][0] = E_STATE;
-        }
-
-        //from E' state
-        temp_alpha = prev_result->alpha[R_STATE][prev_seq_len - 1] - hmm_ptr->tr[TR_ER];
-        if (temp_alpha < alpha[R_STATE][0]){
-            alpha[R_STATE][0] = temp_alpha;
-            path[R_STATE][0] = E_STATE_1;
-        }
-        alpha[R_STATE][0] -= log95;
-
+        alpha[R_STATE][0] = non_coding_state_prob_evaluation(0, hmm_ptr, &res, prev_result, from, to);
 
         ///
         ///END state
         ///
-        if (alpha[E_STATE][0] == 0){
-            alpha[E_STATE][0] = max_dbl;
-            path[E_STATE][0] = NOSTATE;
-
-            if (len_seq > 2 && O[0] == 'T' &&
-                ( (O[1] == 'A' && O[2] == 'A') ||
-                  (O[1] == 'A' && O[2] == 'G') ||
-                  (O[1] == 'G' && O[2] == 'A'))) {
-
-                alpha[E_STATE][2] = max_dbl;
-                //transition from frame 4, frame 5, frame 6;
-                temp_alpha = prev_result->alpha[M6_STATE][prev_seq_len - 1] - hmm_ptr->tr[TR_GE];
-                if (temp_alpha < alpha[E_STATE][2]) {
-                    alpha[E_STATE][2] = temp_alpha;
-                    path[E_STATE][0] = M6_STATE;
-                }
-
-                //transition from frame 1, frame 2, frame 3
-                temp_alpha = prev_result->alpha[M3_STATE][prev_seq_len - 1] - hmm_ptr->tr[TR_GE];
-                if (temp_alpha < alpha[E_STATE][2]) {
-                    alpha[E_STATE][2] = temp_alpha;
-                    path[E_STATE][0] = M3_STATE;
-                }
-                alpha[E_STATE][0] = max_dbl;
-                alpha[E_STATE][1] = max_dbl;
-                path[E_STATE][1] = E_STATE;
-                path[E_STATE][2] = E_STATE;
-
-                alpha[M6_STATE][2] = max_dbl;
-                alpha[M5_STATE][1] = max_dbl;
-                alpha[M4_STATE][0] = max_dbl;
-                alpha[M3_STATE][2] = max_dbl;
-                alpha[M2_STATE][1] = max_dbl;
-                alpha[M1_STATE][0] = max_dbl;
-
-                if (O[1] == 'A' && O[2] == 'A'){
-                    alpha[E_STATE][2] -= log54;
-                } else if (O[1] == 'A' && O[2] == 'G') {
-                    alpha[E_STATE][2] -=log16;
-                } else if (O[1] == 'G' && O[2] == 'A') {
-                    alpha[E_STATE][2] -= log30;
-                }
-
-                //adjustment based on probability distribution
-                start_freq = 0;
-                freq_id = 0;
-
-                double sub_sum = 0;
-                int sub_count = 0;
-
-                int lower = min(60, prev_seq_len);
-                for (i = -lower; i <= -3; ++i){
-                    start_freq -= hmm_ptr->tr_E[i + 60][trinucleotide(prev_O[prev_seq_len + i], prev_O[prev_seq_len + i + 1], prev_O[prev_seq_len + i + 1])];
-                }
-                start_freq *= 58.0 /  (lower - 2);
-
-                    h_kd = hmm_ptr->E_dist[2] * exp(-1 * pow(start_freq - hmm_ptr->E_dist[1], 2) / (2 * pow(hmm_ptr->E_dist[0], 2)));
-                    r_kd = hmm_ptr->E_dist[5] * exp(-1 * pow(start_freq - hmm_ptr->E_dist[4], 2) / (2 * pow(hmm_ptr->E_dist[3], 2)));
-                    p_kd = h_kd / (h_kd + r_kd);
-
-                    if (p_kd < 0.01){
-                        p_kd = 0.01;
-                    } else if (p_kd > 0.99) {
-                        p_kd = 0.99;
-                    }
-                    alpha[E_STATE][2] = alpha[E_STATE][2] - log(p_kd);
-            }
-        }
+        alpha[E_STATE][0] = end_state_prob_evaluation(0, hmm_ptr,&res, prev_result);
 
         ///
         /// START' state
@@ -452,13 +263,6 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
                     }
                 }
 
-                //int upper = min(len_seq, 60);
-                //for (i = 3; i <= upper; ++i) {
-                //    if (i + 2 < len_seq) {
-                //        start_freq -= hmm_ptr->tr_S_1[i - 3][trinucleotide(O[i], O[i + 1], O[i + 2])];
-                //    }
-                //}
-                //start_freq *= 58.0 / (upper - 2);
                 h_kd = hmm_ptr->S1_dist[2] * exp(-1 * pow(start_freq - hmm_ptr->S1_dist[1], 2) / (2 * pow(hmm_ptr->S1_dist[0], 2)));
                 r_kd = hmm_ptr->S1_dist[5] * exp(-1 * pow(start_freq - hmm_ptr->S1_dist[4], 2) / (2 * pow(hmm_ptr->S1_dist[3], 2)));
                 p_kd = h_kd / (h_kd + r_kd);
@@ -622,7 +426,11 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
             num_N = 0;
         }
         from2 = from0 * 4 + from;
-
+#ifdef profiling
+    FILE *time_f = fopen("group_times.txt", "a");
+    time_t start_t, end_t;
+    time(&start_t);
+#endif
         /******************/
         /* M state        */
         /******************/
@@ -631,6 +439,11 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
                 alpha[i][t] = match_state_prob_evaluation(t, i, hmm_ptr, &res, prev_result, whole_genome, from, from2, to);
             }
         }
+#ifdef profiling
+    time(&end_t);
+    fprintf(time_f, "t = %d, match duration = %f\n", t, difftime(end_t, start_t));
+    time(&start_t);
+#endif
 
         /******************/
         /* I state        */
@@ -638,329 +451,54 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
         for (i=I1_STATE; i<=I6_STATE; i++) {
             alpha[i][t] = insertion_state_prob_evaluation(t, i, hmm_ptr, &res, prev_result, from, from2, to);
         }
-
+#ifdef profiling
+    time(&end_t);
+    fprintf(time_f, "t = %d, insertion duration = %f\n", t, difftime(end_t, start_t));
+    time(&start_t);
+#endif
         /******************/
         /* M' state        */
         /******************/
-
-        for (i=M1_STATE_1; i<=M6_STATE_1; i++)   {
-            if  ((i==M1_STATE_1 || i==M4_STATE_1) &&
-                ( ( t>=3 &&
-                    (((O[t-3] == 'T'||O[t-3] == 't') && (O[t-2] == 'T'||O[t-2] == 't') && (O[t-1] == 'A'||O[t-1] =='a')) ||
-                    ((O[t-3] == 'C'||O[t-3] == 'c') && (O[t-2] == 'T'||O[t-2] == 't') && (O[t-1] == 'A'||O[t-1] =='a')) ||
-                    ((O[t-3] == 'T'||O[t-3] == 't') && (O[t-2] == 'C'||O[t-2] == 'c') && (O[t-1] == 'A'||O[t-1] =='a'))))
-                || (t == 2 && prev_O &&
-                    ( (prev_O[prev_seq_len - 1] == 'T' && O[0] == 'T' && O[1] == 'A') ||
-                    (prev_O[prev_seq_len - 1] == 'C' && O[0] == 'T' && O[1] == 'A') ||
-                    (prev_O[prev_seq_len - 1] == 'T' && O[0] == 'C' && O[1] == 'A') ) )
-                || (t == 1 && prev_O &&
-                    ( (prev_O[prev_seq_len - 2] == 'T' && prev_O[prev_seq_len - 1] == 'T' && O[0] == 'A') ||
-                    (prev_O[prev_seq_len - 2] == 'C' && prev_O[prev_seq_len - 1] == 'T' && O[0] == 'A') ||
-                    (prev_O[prev_seq_len - 2] == 'T' && prev_O[prev_seq_len - 1] == 'C' && O[0] == 'A') ) ) ) )  {
-
-				/* from Start state  since this is actually stop codon in minus strand */
-				alpha[i][t] = alpha[S_STATE_1][t-1] - hmm_ptr->e_M_1[i-M1_STATE_1][from2][to];
-				path[i][t] = S_STATE_1;
-
-            }else{
-
-                if (t==0){
-				
-            }else{
-
-                if (i==M1_STATE_1 ){
-
-                    /* from M state */
-                    j = M6_STATE_1;
-                    alpha[i][t] = alpha[j][t-1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M_1[0][from2][to];
-                    path[i][t] = j;
-
-                    /* from D state */
-                    if (whole_genome==0){
-                        for (j=M5_STATE_1; j>=M1_STATE_1; j--){
-                            if (j >= i){
-                                num_d = i-j+6;
-                            }else if (j+1 <i){
-                                num_d = i-j;
-                            } else {
-                                num_d = -10;
-                            }
-                            if (num_d > 0){
-                                temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M_1[0][from2][to]
-                                                            - log25*(num_d-1) - hmm_ptr->tr[TR_DD]*(num_d-2) - hmm_ptr->tr[TR_DM];
-                                if ( temp_alpha < alpha[i][t]){
-                                    alpha[i][t] = temp_alpha;
-                                    path[i][t] = j;
-                                }
-                            }
-                        }
-                    }
-
-                }else{
-
-                    /* from M state */
-                    j = i - 1;
-                    alpha[i][t] = alpha[j][t-1] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M_1[i-M1_STATE_1][from2][to];
-                    path[i][t] = j;
-
-                    /* from D state */
-                    if (whole_genome==0){
-                        for (j=M6_STATE_1; j>=M1_STATE_1; j--){
-                            if (j >= i ){
-                                num_d = i-j+6;
-                            }else if (j+1 < i){
-                                num_d = i-j;
-                            }else{
-                                num_d = -10;
-                            }
-                            if (num_d>0){
-                                temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M_1[i-M1_STATE_1][from2][to]
-                                    - log25*(num_d-1) - hmm_ptr->tr[TR_DD]*(num_d-2) - hmm_ptr->tr[TR_DM];
-
-                                if ( temp_alpha < alpha[i][t]){
-                                    alpha[i][t] = temp_alpha;
-                                    path[i][t] = j;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                /* from I state */
-                if (i==M1_STATE_1) {
-                    j = I6_STATE_1;
-
-                }else{
-                    j = I1_STATE_1 + (i - M1_STATE_1 -1);
-                }
-
-
-                /* to aviod stop codon */
-                if (t<2){
-                    //t = 1
-                    if (prev_result) {
-                        if ((i == M2_STATE_1 || i == M5_STATE_1) && O[2] == 'A' &&
-                                ( (prev_O[-temp_i[j - I1_STATE_1]] == 'T' && O[1] == 'T') ||
-                                  (prev_O[-temp_i[j - I1_STATE_1]] == 'C' && O[1] == 'T') ||
-                                  (prev_O[-temp_i[j - I1_STATE_1]] == 'T' && O[1] == 'C') )) {
-                        } else if ((i == M3_STATE_1 || i == M6_STATE_1) && O[1] == 'A' &&
-                                       ( ( prev_O[-temp_i[j - I1_STATE_1] - 1] == 'T' && prev_O[-temp_i[j - I1_STATE_1]] == 'T') ||
-                                         ( prev_O[-temp_i[j - I1_STATE_1] - 1] == 'C' && prev_O[-temp_i[j - I1_STATE_1]] == 'T') ||
-                                         ( prev_O[-temp_i[j - I1_STATE_1] - 1] == 'T' && prev_O[-temp_i[j - I1_STATE_1]] == 'C') ) ){
-
-                            } else {
-                                temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_IM] - log25;
-                                if (temp_alpha < alpha[i][t]) {
-                                    alpha[i][t] = temp_alpha;
-                                    path[i][t] = j;
-                                }
-                        }
-
-                    }
-                } else  if ((i==M2_STATE_1 || i==M5_STATE_1) && (O[t+1] == 'A'||O[t+1] == 'a') &&
-					   (((O[temp_i_1[j-I1_STATE_1]] == 'T'|| O[temp_i_1[j-I1_STATE_1]] == 't') && (O[t] =='T'|| O[t] =='t')) ||
-							((O[temp_i_1[j-I1_STATE_1]] == 'C'|| O[temp_i_1[j-I1_STATE_1]] == 'c') && (O[t] =='T'|| O[t] =='t')) ||
-							((O[temp_i_1[j-I1_STATE_1]] == 'T'|| O[temp_i_1[j-I1_STATE_1]] == 't') && (O[t] =='C'|| O[t] =='c')))){
-
-                    }else if ( temp_i_1[j - I1_STATE_1] > 0 &&
-                            (i==M3_STATE_1 || i==M6_STATE_1) && (O[t] == 'A'||O[t] == 'a') &&
-                            (((O[temp_i_1[j-I1_STATE_1]-1] == 'T'|| O[temp_i_1[j-I1_STATE_1]-1]=='t') &&
-							 (O[temp_i_1[j-I1_STATE_1]] =='T'|| O[temp_i_1[j-I1_STATE_1]] =='t')) || 
-							((O[temp_i_1[j-I1_STATE_1]-1] == 'C'|| O[temp_i_1[j-I1_STATE_1]-1]=='c') &&
-							 (O[temp_i_1[j-I1_STATE_1]] =='T'|| O[temp_i_1[j-I1_STATE_1]] =='t')) || 
-							((O[temp_i_1[j-I1_STATE_1]-1] == 'T'|| O[temp_i_1[j-I1_STATE_1]-1]=='t') &&
-							 (O[temp_i_1[j-I1_STATE_1]] =='C'|| O[temp_i_1[j-I1_STATE_1]] =='c')))){
-					}else {
-
-						temp_alpha = alpha[j][t-1]  - hmm_ptr->tr[TR_IM] - log25;
-						if ( temp_alpha < alpha[i][t]){
-							alpha[i][t] = temp_alpha;
-							path[i][t] = j;
-						}
-					}
-				}
-            }
+        for (i = M1_STATE_1; i <= M6_STATE_1; ++i) {
+            alpha[i][t] = match1_state_prob_evaluation(t, i, hmm_ptr, &res, prev_result, whole_genome, from, from2, to);
         }
-
+#ifdef profiling
+    time(&end_t);
+    fprintf(time_f, "t = %d, match' duration = %f\n", t, difftime(end_t, start_t));
+    time(&start_t);
+#endif
     /******************/
     /* I' state        */
     /******************/
-        for (i=I1_STATE_1; i<=I6_STATE_1; i++) {
 
-            if (t==0){
+    for (i=I1_STATE_1; i<=I6_STATE_1; i++) {
+        alpha[i][t] = insertion1_state_prob_evaluation(t, i, hmm_ptr, &res, prev_result, from, from2, to);
+    }
 
-            }else{
-				/* from I state */
-                j = i;
-				alpha[i][t] = alpha[j][t-1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
-				path[i][t] = j;
-
-				/* from M state */
-                if (t > 4) {
-                    if (path[S_STATE_1][t-3] != R_STATE && path[S_STATE_1][t-4] != R_STATE && path[S_STATE_1][t-5] != R_STATE){
-                        j = i - I1_STATE_1 + M1_STATE_1;
-                        if (i==I6_STATE_1){
-                            temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MI] -hmm_ptr->tr_M_I[from][to];
-                        }else{
-                            temp_alpha = alpha[j][t-1]  - hmm_ptr->tr[TR_MI] -hmm_ptr->tr_M_I[from][to];
-                        }
-                        if (temp_alpha < alpha[i][t]){
-                            alpha[i][t] = temp_alpha;
-                            path[i][t] = j;
-
-                            temp_i_1[i-I1_STATE_1] = t-1;
-                        }
-                    }
-                } else if (prev_result) {
-                    int flag = 0;
-                    switch (t){
-                    case 4:
-                        if (path[S_STATE_1][1] != R_STATE &&
-                                path[S_STATE_1][0] != R_STATE &&
-                                prev_result->path[S_STATE_1][prev_seq_len - 1] != R_STATE) {
-
-                            flag = 1;
-                        }
-                        break;
-                    case 3:
-                        if (prev_seq_len > 1 && path[S_STATE_1][0] != R_STATE &&
-                                prev_result->path[S_STATE_1][prev_seq_len - 1] != R_STATE &&
-                                prev_result->path[S_STATE_1][prev_seq_len - 2] != R_STATE) {
-                            flag = 1;
-                        }
-                        break;
-                    case 2:
-                        if (prev_seq_len > 2 && prev_result->path[S_STATE_1][prev_seq_len - 1] != R_STATE &&
-                                prev_result->path[S_STATE_1][prev_seq_len - 2] != R_STATE &&
-                                prev_result->path[S_STATE_1][prev_seq_len - 3] != R_STATE) {
-                            flag = 1;
-                        }
-                        break;
-                    case 1:
-                        if (prev_seq_len > 3 && prev_result->path[S_STATE_1][prev_seq_len - 2] != R_STATE &&
-                                prev_result->path[S_STATE_1][prev_seq_len - 3] != R_STATE &&
-                                prev_result->path[S_STATE_1][prev_seq_len - 4] != R_STATE) {
-                            flag = 1;
-                        }
-
-                        break;
-                    }
-                    if (flag == 1){
-                        j = i - I1_STATE_1 + M1_STATE_1;
-                        if (i==I6_STATE_1){
-                            temp_alpha = alpha[j][t-1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MI] -hmm_ptr->tr_M_I[from][to];
-                        }else{
-                            temp_alpha = alpha[j][t-1]  - hmm_ptr->tr[TR_MI] -hmm_ptr->tr_M_I[from][to];
-                        }
-                        if (temp_alpha < alpha[i][t]){
-                            alpha[i][t] = temp_alpha;
-                            path[i][t] = j;
-
-                            temp_i_1[i-I1_STATE_1] = t-1;
-                        }
-                    }
-                }
-            }
-        }
-
+#ifdef profiling
+    time(&end_t);
+    fprintf(time_f, "t = %d, insertion' duration = %f\n", t, difftime(end_t, start_t));
+    time(&start_t);
+#endif
     /***********************/
     /* Non_coding state    */
     /***********************/
 
     alpha[R_STATE][t] = non_coding_state_prob_evaluation(t, hmm_ptr, &res, prev_result, from, to);
-
+#ifdef profiling
+    time(&end_t);
+    fprintf(time_f, "t = %d, non coding duration = %f\n", t, difftime(end_t, start_t));
+    time(&start_t);
+#endif
     /******************/
     /* END state      */
     /******************/
     alpha[E_STATE][t] = end_state_prob_evaluation(t, hmm_ptr, &res, prev_result);
-#ifdef old_end
-    if (alpha[E_STATE][t] == 0){ // Check if previously we haven't considered state number t to be a part of stop codon?
 
-            alpha[E_STATE][t] = max_dbl;
-            path[E_STATE][t] = NOSTATE;
-
-            if (t < len_seq -2 && (O[t] == 'T'||O[t] == 't')  &&
-                     (((O[t+1] == 'A'||O[t+1] == 'a') && (O[t+2] == 'A'||O[t+2] =='a')) ||
-                        ((O[t+1] == 'A'||O[t+1] == 'a') && (O[t+2] == 'G'||O[t+2] =='g')) ||
-                        ((O[t+1] == 'G'||O[t+1] == 'g') && (O[t+2] == 'A'||O[t+2] =='a')))) {
-
-                alpha[E_STATE][t+2] = max_dbl;
-                /* transition from frame4,frame5,and frame6 */             //Frame numerations here and in the article are different.
-                temp_alpha = alpha[M6_STATE][t-1] - hmm_ptr->tr[TR_GE];
-                if (temp_alpha < alpha[E_STATE][t+2]){
-                    alpha[E_STATE][t+2] = temp_alpha;
-                    path[E_STATE][t] = M6_STATE;
-                }
-
-                /* transition from frame1,frame2,and frame3 */
-                temp_alpha  = alpha[M3_STATE][t-1] - hmm_ptr->tr[TR_GE];
-                if (temp_alpha < alpha[E_STATE][t+2]){
-                    alpha[E_STATE][t+2] = temp_alpha;
-                    path[E_STATE][t] = M3_STATE;
-                }
-
-                alpha[E_STATE][t] = max_dbl;
-                alpha[E_STATE][t+1] = max_dbl;
-                path[E_STATE][t+1] = E_STATE;
-                path[E_STATE][t+2] = E_STATE;
-
-                alpha[M6_STATE][t+2] = max_dbl;
-                alpha[M5_STATE][t+1] = max_dbl;
-                alpha[M4_STATE][t] = max_dbl;
-                alpha[M3_STATE][t+2] = max_dbl;
-                alpha[M2_STATE][t+1] = max_dbl;
-                alpha[M1_STATE][t] = max_dbl;
-
-                if ((O[t+1] == 'A'||O[t+1] =='a') && (O[t+2] == 'A'||O[t+2] =='a')){
-                    alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log54;
-                }else if ((O[t+1] == 'A'||O[t+1] =='a') && (O[t+2] == 'G'||O[t+2] =='g')){
-                    alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log16;
-                }else if((O[t+1] == 'G'||O[t+1] == 'g') && (O[t+2] == 'A'||O[t+2] =='a')) {
-                    alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log30;
-                }
-
-                /* adjustment based on probability distribution */
-                start_freq=0;
-                freq_id = 0;
-
-                double sub_sum = 0;
-                int sub_count = 0;
-
-                if (!prev_result || t >= 60){ // !prev_result => no prev edge; t >= 60 => we don't need prev edge
-                    int lbound = min(t, 60);
-
-                    for (i = -lbound; i <= -3; ++i){
-                        if (t + i + 2 < len_seq) {
-                            sub_sum += hmm_ptr->tr_E[i+60][trinucleotide(O[t+i], O[t+i+1], O[t+i+2])];
-                        }
-                    }
-
-                    sub_sum  *=  58.0 / (lbound - 2);
-                    start_freq -= sub_sum;
-                } else  if (prev_result){
-                    int lbound = min(60, prev_seq_len + t);
-                    for (i = -lbound; i <= -3; ++i) {
-                        int cd1, cd2, cd3;
-                        cd1 = (t + i > 0) ? O[t + i] : prev_O[prev_seq_len + t + i];
-                        cd2 = (t + i + 1 > 0) ? O[t + i + 1] : prev_O[prev_seq_len + t + i + 1];
-                        cd3 = (t + i + 2 > 0) ? O[t + i + 2] : prev_O[prev_seq_len + t + 2];
-                        start_freq -= hmm_ptr->tr_E[i + 60][trinucleotide(cd1, cd2, cd3)];
-                    }
-                    start_freq *= 58.0 / (lbound - 2);
-                }
-                h_kd = hmm_ptr->E_dist[2] * exp(-1*pow(start_freq-hmm_ptr->E_dist[1],2)/(2*pow(hmm_ptr->E_dist[0],2)));
-                r_kd = hmm_ptr->E_dist[5] * exp(-1*pow(start_freq-hmm_ptr->E_dist[4],2)/(2*pow(hmm_ptr->E_dist[3],2)));
-                p_kd = h_kd / (h_kd + r_kd);
-
-                if (p_kd<0.01){
-                    p_kd=0.01;
-                }else if (p_kd>0.99){
-                    p_kd=0.99;
-                }
-                alpha[E_STATE][t+2] = alpha[E_STATE][t+2] - log(p_kd);
-
-            }
-        }
+#ifdef profiling
+    time(&end_t);
+    fprintf(time_f, "t = %d, end duration = %f\n", t, difftime(end_t, start_t));
+    time(&start_t);
 #endif
     /*************************************************/
     /* START' state                                  */
@@ -1026,6 +564,11 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 				alpha[S_STATE_1][t+2] = alpha[S_STATE_1][t+2] - log(p_kd);
       }
     }
+#ifdef profiling
+    time(&end_t);
+    fprintf(time_f, "t = %d, start' duration = %f\n", t, difftime(end_t, start_t));
+    time(&start_t);
+#endif
 
     /************************/
     /* START state          */
@@ -1106,6 +649,11 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
 
         }
     }
+#ifdef profiling
+    time(&end_t);
+    fprintf(time_f, "t = %d, start duration = %f\n", t, difftime(end_t, start_t));
+    time(&start_t);
+#endif
 
     /**********************************************/
     /* END' state                                 */
@@ -1174,6 +722,13 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
             alpha[E_STATE_1][t+2] = alpha[E_STATE_1][t+2] - log(p_kd);
         }
     }
+
+#ifdef profiling
+    time(&end_t);
+    fprintf(time_f, "t = %d, end' duration = %f\n", t, difftime(end_t, start_t));
+    fclose(time_f);
+#endif
+
     if (num_N>9){
 			for (i=0; i<NUM_STATE; i++){
 				if (i!=R_STATE){
@@ -1187,7 +742,7 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
     printf("The Viterbi matrix was evaluated\n");
     //char *fname = "../run_result/viterbi_matrix.csv";
     char fname[4096];
-    sprintf(fname, "../run_result/with_graph/single_edge/%s-matrix.csv", head);
+    sprintf(fname, "../run_result/with_graph/multiple_edge/%s-matrix.csv", head);
     FILE *f = fopen(fname, "w");
     if (!f) {
         printf("The file was not opened\n");
@@ -1195,7 +750,7 @@ ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *pr
     print_viterbi(alpha, len_seq, NUM_STATE, f);
     fclose(f);
 
-    sprintf(fname, "../run_result/with_graph/single_edge/%s-path.csv", head);
+    sprintf(fname, "../run_result/with_graph/multiple_edge/%s-path.csv", head);
     FILE *f_path = fopen(fname, "w");
     if(!f_path) {
         printf("Path file was not opened\n");
@@ -2045,6 +1600,7 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
         alpha[i][t] = ans;
         return alpha[i][t];
     }
+
     if (prev_result && t == 0){
         int prev_seq_len = prev_result->len_seq;
         if (i == M1_STATE) {
@@ -2052,17 +1608,20 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
             j = M6_STATE;
             ans = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to];
             tmp_path = j;
+            printf("From M, i = %d, j = %d\n", i, j);
 
             //from D
             if (!whole_genome){
                 for (j = M5_STATE; j >= M1_STATE; --j){
                     num_d = i - j + 6;
-                }
-                temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[0][from2][to] -
-                            log(0.25) * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
-                if (temp_alpha < ans) {
-                    ans = temp_alpha;
-                    tmp_path = j;
+                    temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[0][from2][to] -
+                                log(0.25) * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
+                    if (temp_alpha < ans) {
+                        ans = temp_alpha;
+                        tmp_path = j;
+                        printf("From D, i = %d, j = %d\n", i, j);
+
+                    }
                 }
             }
             //from S
@@ -2071,6 +1630,8 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
             if (temp_alpha < ans) {
                 ans = temp_alpha;
                 tmp_path = j;
+                printf("From S, i = %d, j = %d\n", i, j);
+
             }
         } else{
             /// i = M2, ..., M6
@@ -2078,9 +1639,11 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
             j = i - 1;
             ans = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i-M1_STATE][from2][to];
             tmp_path = j;
+            printf("From M, i = %d, j = %d\n", i, j);
+
             // from D
             if (!whole_genome) {
-                for (j = M6_STATE; j >= M1_STATE; ++j) {
+                for (j = M6_STATE; j >= M1_STATE; --j) {
                     num_d = (j >= i) ? (i - j + 6) : ( (j + 1 < i) ? i - j : -10 );
                     if (num_d > 0) {
                         temp_alpha = prev_result->alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M[i- M1_STATE][from2][to] -
@@ -2088,6 +1651,7 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
                         if (temp_alpha < ans) {
                             ans = temp_alpha;
                             tmp_path = j;
+                            printf("From D, i = %d, j = %d\n", i, j);
                         }
                     }
                 }
@@ -2111,12 +1675,14 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
             if (temp_alpha < ans) {
                 ans = temp_alpha;
                 tmp_path = j;
+                printf("From I, i = %d, j = %d\n", i, j);
             }
         }
         curr_res->path[i][0] = tmp_path;
         curr_res->alpha[i][0] = ans;
         return ans;
     }
+
     if (prev_result && t > 0){
         if (i == M1_STATE) {
             //from M
@@ -2149,7 +1715,7 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
             tmp_path = j;
             //from D
             if (whole_genome == 0) {
-                for (j = M6_STATE; j >= M1_STATE; ++j) {
+                for (j = M6_STATE; j >= M1_STATE; --j) {
                     if (j >= i) {
                         num_d = i - j + 6;
                     } else if (j + 1 < i) {
@@ -2199,6 +1765,131 @@ double match_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *cu
     return max_dbl + 1;
 }
 
+double match1_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result, int whole_genome,
+                                    int from, int from2, int to) {
+    if (t == 0 && !prev_result) {
+        curr_res->alpha[i][0] = -hmm_ptr->pi[i];
+        return curr_res->alpha[i][0];
+    }
+    double max_dbl = 10000000000.0;
+    double ans, temp_alpha, alpha1;
+    int j, tmp_path, num_d, prev_seq_len = (prev_result) ? prev_result->len_seq : -1;
+    double **alpha = curr_res->alpha, **prev_alpha = (!prev_result) ? NULL : prev_result->alpha;
+    char* O = curr_res->O, *prev_O = (!prev_result) ? NULL : prev_result->O;
+    int **path = curr_res->path;
+    int *temp_i_1 = curr_res->temp_i_1, *prev_temp_i_1 = (!prev_result) ? NULL : prev_result->temp_i_1;
+
+    char prev1, prev2, prev3;
+    prev1 = (t >= 1) ? O[t - 1] : (prev_result ? prev_O[prev_seq_len - 1] : -1);
+    prev2 = (t >= 2) ? O[t - 2] : (prev_result ? prev_O[prev_seq_len + (t - 2)] : -1);
+    prev3 = (t >= 3) ? O[t - 3] : (prev_result ? prev_O[prev_seq_len + (t - 3)] : -1);
+
+
+    if ((i == M1_STATE_1 || i == M4_STATE_1) && (t >= 3 || prev_result) &&
+            ( (prev3 == 'T' && prev2 == 'T' && prev1 == 'A') ||
+              (prev3 == 'C' && prev2 == 'T' && prev1 == 'A') ||
+              (prev3 == 'T' && prev2 == 'C' && prev1 == 'A') )){
+        //from S
+        alpha1 = (t > 0) ? alpha[S_STATE_1][t - 1] : prev_alpha[S_STATE_1][prev_seq_len - 1];
+        alpha[i][t] = alpha1 - hmm_ptr->e_M_1[i - M1_STATE_1][from2][to];
+        path[i][t] = S_STATE_1;
+        return alpha[i][t];
+    } else {
+        if (i == M1_STATE_1) {
+            //from M
+            j = M6_STATE_1;
+            //case t = 0 and prev_result is null considered above, so if t == 0 then prev_result is not null
+            alpha1 = (t > 0) ? alpha[j][t - 1] : prev_alpha[j][prev_seq_len - 1];
+            ans = alpha1 - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M_1[0][from2][to];
+            tmp_path = j;
+
+            //from D
+            if (whole_genome == 0) {
+                for (j = M5_STATE_1; j >= M1_STATE_1; --j){
+                    num_d = i - j + 6;
+                    alpha1 = (t > 0) ? alpha[j][t - 1] : prev_alpha[j][prev_seq_len - 1];
+                    temp_alpha = alpha1 - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M_1[0][from2][to] -
+                            log(0.25) * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
+                    if (temp_alpha < ans) {
+                        ans = temp_alpha;
+                        tmp_path = j;
+                    }
+                }
+            }
+        } else {
+            //from M
+            j = i - 1;
+            alpha1 = (t > 0) ? alpha[j][t - 1] : prev_alpha[j][prev_seq_len - 1];
+            ans = alpha1 - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M_1[i - M1_STATE_1][from2][to];
+            tmp_path = j;
+
+            //from D
+            if (!whole_genome){
+                for (j = M6_STATE_1; j >= M1_STATE_1; --j) {
+                    if (j >= i) {
+                        num_d = i - j + 6;
+                    } else if (j + 1 < i) {
+                        num_d = i - j;
+                    } else {
+                        num_d = -10;
+                    }
+
+                    if (num_d > 0){
+                        alpha1 = (t > 0) ? alpha[j][t - 1] : prev_alpha[j][prev_seq_len - 1];
+                        temp_alpha = alpha1 - hmm_ptr->tr[TR_MD] - hmm_ptr->e_M_1[i - M1_STATE_1][from2][to] -
+                                log(0.25) * (num_d - 1) - hmm_ptr->tr[TR_DD] * (num_d - 2) - hmm_ptr->tr[TR_DM];
+                        if (temp_alpha < ans) {
+                            ans = temp_alpha;
+                            tmp_path = j;
+                        }
+                    }
+                }
+            }
+        }
+        //from I
+        j = (i == M1_STATE_1) ? I6_STATE_1 : (I1_STATE_1 + (i - M1_STATE_1 - 1));
+        if (t < 2 && !prev_result){
+
+        } else {
+            prev1 = (!prev_result) ? O[temp_i_1[j - I1_STATE_1]] :
+                    ( (t == 0) ? prev_O[prev_temp_i_1[j - I1_STATE_1]] :
+                        (temp_i_1[j - I1_STATE_1] >= 0 ? O[temp_i_1[j - I1_STATE_1]] : prev_O[-temp_i_1[j - I1_STATE_1]]));
+            if ((i == M2_STATE_1 || i == M5_STATE_1) && (t + 1 < curr_res->len_seq) && O[t + 1] == 'A' &&
+                    ( (prev1 == 'T' && O[t] == 'T') ||
+                      (prev1 == 'C' && O[t] == 'T') ||
+                      (prev1 == 'T' && O[t] == 'C') )) {
+                //nothing
+            } else {
+                prev1 = (!prev_result) ? O[temp_i_1[j - I1_STATE_1]] :
+                        ((t == 0) ? prev_O[prev_temp_i_1[j - I1_STATE_1]] :
+                            (temp_i_1[j - I1_STATE_1] >= 0 ? O[temp_i_1[j - I1_STATE_1]] : prev_O[-temp_i_1[j - I1_STATE_1]]));
+                prev2 =(!prev_result) ? O[temp_i_1[j - I1_STATE_1] - 1] :
+                            ((t == 0) ? prev_O[prev_temp_i_1[j - I1_STATE_1] - 1] :
+                                (temp_i_1[j - I1_STATE_1] > 0 ? O[temp_i_1[j - I1_STATE_1] - 1] :
+                                    (temp_i_1[j - I1_STATE_1] < 0 ? prev_O[prev_temp_i_1[j - I1_STATE_1] - 1] :
+                                        prev_O[prev_seq_len - 1]) ));
+                if ((i == M3_STATE_1 || i == M6_STATE_1) && (temp_i_1[j - I1_STATE_1] > 0 || prev_result) && O[t] == 'A' &&
+                        ( (prev2 == 'T' && prev1 == 'T') ||
+                          (prev2 == 'C' && prev1 == 'T') ||
+                          (prev2 == 'T' && prev1 == 'C') )) {
+                    //nothing
+                } else {
+                    alpha1 = (t > 0) ? alpha[j][t - 1] : prev_alpha[j][prev_seq_len - 1];
+                    temp_alpha = alpha1 - hmm_ptr->tr[TR_IM] - log(0.25);
+                    if (temp_alpha < ans) {
+                        ans = temp_alpha;
+                        tmp_path = j;
+                    }
+                }
+            }
+        }
+        curr_res->alpha[i][t] = ans;
+        curr_res->path[i][t] = tmp_path;
+        return ans;
+    }
+    return max_dbl + 1;
+}
+
 double insertion_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result,
                                        int from, int from2, int to) {
     double max_dbl = 10000000000.0;
@@ -2235,6 +1926,7 @@ double insertion_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult
         j = i;
         ans = prev_result->alpha[j][prev_result->len_seq - 1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
         temp_path = j;
+        curr_res->temp_i[i - I1_STATE] = -(prev_result->temp_i[i - I1_STATE]);
         //from M
         j = i - I1_STATE + M1_STATE;
         if (i == I6_STATE) {
@@ -2249,8 +1941,83 @@ double insertion_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult
             curr_res->temp_i[i - I1_STATE] = -(prev_result->len_seq - 1);
         }
         curr_res->alpha[i][0] = ans;
-        curr_res->alpha[i][0] = temp_path;
+        curr_res->path[i][0] = temp_path;
         return ans;
+    }
+    return max_dbl + 1;
+}
+
+double insertion1_state_prob_evaluation(int t, int i, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result, int from, int from2, int to){
+    double max_dbl = 10000000000.0;
+    if (t == 0 && !prev_result){
+        curr_res->alpha[i][0] = -hmm_ptr->pi[i];
+        return curr_res->alpha[i][0];
+    }
+    double **alpha = curr_res->alpha, ans, temp_alpha, alpha1;
+    int j, temp_path, prev_seq_len = (prev_result) ? prev_result->len_seq: -10;
+    int ** path = curr_res->path;
+
+    if (prev_result && t < 5) {
+        //if (t == 0) {
+        //    curr_res->temp_i_1[i - I1_STATE_1] = -prev_result->temp_i_1[i - I1_STATE_1];
+        //}
+        //from I
+        j = i;
+        alpha1 = (t > 0) ? alpha[j][t - 1] : prev_result->alpha[j][prev_seq_len - 1];
+        ans = alpha1 - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
+        temp_path = j;
+
+        //from M
+        int path3, path4, path5;
+        path3 = (t >= 3) ? path[S_STATE_1][t - 3] : prev_result->path[S_STATE_1][prev_seq_len + (t - 3)];
+        path4 = (t >= 4) ? path[S_STATE_1][t - 4] : prev_result->path[S_STATE_1][prev_seq_len + (t - 4)];
+        path5 = (t >= 5) ? path[S_STATE_1][t - 5] : prev_result->path[S_STATE_1][prev_seq_len + (t - 5)];
+        if (path3 != R_STATE && path4 != R_STATE && path5 != R_STATE) {
+            j = i - I1_STATE_1 + M1_STATE_1;
+            alpha1 = (t > 0) ? alpha[j][t - 1] : prev_result->alpha[j][prev_seq_len - 1];
+            if (i == I6_STATE_1) {
+                temp_alpha = alpha1 - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MI] - hmm_ptr->tr_M_I[from][to];
+            } else {
+                temp_alpha = alpha1 - hmm_ptr->tr[TR_MI] - hmm_ptr->tr_M_I[from][to];
+            }
+            if (temp_alpha < ans) {
+                ans = temp_alpha;
+                temp_path = j;
+
+                curr_res->temp_i_1[i - I1_STATE_1] = (t > 0) ? (t - 1) : -(prev_seq_len - 1);
+            }
+        }
+        alpha[i][t] = ans;
+        path[i][t] = temp_path;
+        return ans;
+    } else if (t >= 5) {
+        //from I
+        j = i;
+        ans = alpha[j][t - 1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
+        temp_path = j;
+
+        //from M
+        if (path[S_STATE_1][t - 3] != R_STATE && path[S_STATE_1][t - 4] != R_STATE && path[S_STATE_1][t - 5] != R_STATE){
+            j = i - I1_STATE_1 + M1_STATE_1;
+            if (i == I6_STATE_1) {
+                temp_alpha = alpha[j][t - 1] - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MI] - hmm_ptr->tr_M_I[from][to];
+            } else {
+                temp_alpha = alpha[j][t - 1] - hmm_ptr->tr[TR_MI] - hmm_ptr->tr_M_I[from][to];
+            }
+            if (temp_alpha < ans) {
+                ans = temp_alpha;
+                temp_path  = j;
+
+                curr_res->temp_i_1[i - I1_STATE_1] = t - 1;
+            }
+        }
+        path[i][t] = temp_path;
+        alpha[i][t] = ans;
+        return ans;
+    } else if (!prev_result && t < 5){
+        path[i][t] = i;
+        alpha[i][t] = alpha[i][t - 1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
+        return alpha[i][t];
     }
     return max_dbl + 1;
 }
@@ -2263,6 +2030,15 @@ double non_coding_state_prob_evaluation(int t, HMM *hmm_ptr, ViterbiResult *curr
     double ans, temp_alpha, max_dbl = 10000000000.0;
     int tmp_path;
     if (prev_result && t == 0) {
+#ifdef R_state_debug
+    FILE *f = fopen("vertex_r_state.txt", "w");
+    fprintf(f, "current symbol: %c\nfrom: %d\nto: %d\n", curr_res->O[0], from, to);
+    fprintf(f, "prev alpha R_STATE: %lf\n", prev_result->alpha[R_STATE][prev_result->len_seq - 1]);
+    fprintf(f, "tr_R_R: %lf\n", hmm_ptr->tr_R_R[from][to]);
+    fprintf(f, "prev alpha E_STATE: %lf\n", prev_result->alpha[E_STATE][prev_result->len_seq - 1]);
+    fprintf(f, "prev alpha E_STATE_1: %lf\n", prev_result->alpha[E_STATE_1][prev_result->len_seq - 1]);
+    fclose(f);
+#endif
         //from R
         ans = prev_result->alpha[R_STATE][prev_result->len_seq - 1] - hmm_ptr->tr[TR_RR] - hmm_ptr->tr_R_R[from][to];
         tmp_path = R_STATE;
@@ -2288,6 +2064,17 @@ double non_coding_state_prob_evaluation(int t, HMM *hmm_ptr, ViterbiResult *curr
     }
     double **alpha = curr_res->alpha;
     if (t > 0) {
+#ifdef R_state_debug
+    if (t == 104 && !prev_result) {
+        FILE *f = fopen("edge_r_state.txt", "w");
+        fprintf(f, "current symbol: %c\nfrom: %d\nto: %d\n", curr_res->O[t], from, to);
+        fprintf(f, "prev alpha R_STATE: %lf\n", alpha[R_STATE][t - 1]);
+        fprintf(f, "tr_R_R: %lf\n", hmm_ptr->tr_R_R[from][to]);
+        fprintf(f, "prev alpha E_STATE: %lf\n", alpha[E_STATE][t - 1]);
+        fprintf(f, "prev alpha E_STATE_1: %lf\n", alpha[E_STATE_1][t - 1]);
+        fclose(f);
+    }
+#endif
         //from R
         ans = alpha[R_STATE][t - 1] - hmm_ptr->tr_R_R[from][to] - hmm_ptr->tr[TR_RR];
         tmp_path = R_STATE;
