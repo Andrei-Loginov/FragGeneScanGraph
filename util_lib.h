@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <math.h>
 
+#define EPS 1e-6
+
 double **dmatrix(int num_row, int num_col);
 double *dvector(int nh);
 int **imatrix(int num_row, int num_col);
@@ -26,3 +28,9 @@ void print_viterbi(double **matr, int len_seq, int n_state, FILE *f);
 void print_path(int **matr, int len_seq, int n_state, FILE *f);
 int min(int lhs, int rhs);
 int max(int lhs, int rhs);
+
+int is_equal(double a, double b);
+
+void fprint_imatrix(int **matr, int nrow, int ncol, char *fname);
+void fprint_dmatrix(double **matr, int nrow, int ncol, char *fname);
+void fprint_ivector(int *v, int n, char *fname);

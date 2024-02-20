@@ -2,6 +2,8 @@ QT -= gui
 
 CONFIG += c++11 console
 CONFIG -= app_bundle
+#CONFIG += sanitizer sanitize_address
+
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.

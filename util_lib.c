@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "util_lib.h"
 
 double log2(double a){
   return log(a)/log(2);
@@ -400,4 +401,52 @@ int min(int lhs, int rhs) {
 
 int max(int lhs, int rhs) {
     return (lhs > rhs) ? lhs : rhs;
+}
+
+int is_equal(double a, double b){
+    if (fabs(a - b) < EPS)
+        return 1;
+    else return 0;
+}
+
+void fprint_imatrix(int **matr, int nrow, int ncol, char *fname){
+    FILE *f = fopen(fname, "w");
+    if (!f){
+        printf("Can't open output file %s\n", fname);
+        return;
+    }
+    int i, j;
+    for (i = 0; i < nrow; ++i){
+        for (j = 0; j < ncol; ++j){
+            fprintf(f, "%d ", matr[i][j]);
+        }
+        fprintf(f, "\n");
+    }
+    fclose(f);
+}
+
+void fprint_dmatrix(double **matr, int nrow, int ncol, char *fname){
+    FILE *f = fopen(fname, "w");
+    if (!f){
+        printf("Can't open output file %s\n", fname);
+        return;
+    }
+    int i, j;
+    for (i = 0; i < nrow; ++i){
+        for (j = 0; j < ncol; ++j){
+            fprintf(f, "%lf ", matr[i][j]);
+        }
+        fprintf(f, "\n");
+    }
+    fclose(f);
+}
+
+void fprint_ivector(int *v, int n, char *fname){
+    FILE *f = fopen(fname, "w");
+    int i;
+    for (i = 0; i < n; ++i)
+        fprintf(f, "%d ", v[i]);
+    fprintf(f, "\n");
+    fclose(f);
+    return;
 }
