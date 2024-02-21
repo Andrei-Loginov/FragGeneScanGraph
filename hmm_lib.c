@@ -12,7 +12,7 @@
 //#define E_state_debug
 //#define M_state_profiling
 //#define profiling
-//#define M_state_debug
+#define M_state_debug
 //#define R_state_debug
 //#define match_vertex
 #define I1_debug
@@ -2450,7 +2450,11 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
                 prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
             }
             from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
-            alpha1 = (t == 0) ? prev_alpha[j][prev_seq_len - 1] : alpha[j][t - 1] ;
+            alpha1 = (t == 0) ? prev_alpha[j][prev_seq_len - 1] : alpha[j][t - 1];
+
+#ifdef M_state_debug
+            double tr_gg = hmm_ptr->tr[TR_GG], tr_mm = hmm_ptr->tr[TR_MM], e_m = hmm_ptr->e_M[0][from2][to];
+#endif
             ans_res.alpha = alpha1 - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to];
             ans_res.path = j;
             ans_res.prev_ind = (t == 0) ? prev_ind : curr_res->curr_column_prev[j + 1];
