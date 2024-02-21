@@ -808,7 +808,7 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
     free_ivector(prev_indices);
 #ifdef viterbi_out_flg
     char fname[4096];
-    sprintf(fname, "../run_result/with_graph/multiple_edge/%s-matrix.csv", g->head[edge_index]);
+    sprintf(fname, "../run_result/with_graph/multiple_edge/%s-new-matrix.csv", g->head[edge_index]);
     FILE *f = fopen(fname, "w");
     if (!f) {
         printf("The file was not opened\n");
@@ -2269,31 +2269,31 @@ double any_state_prob(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, Viter
     if (n_prev == 0) {
         switch (group){
             case M_GROUP:
-                ans_res = match_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, whole_genome, to);
+                ans_res = match_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, n_prev, whole_genome, to);
             break;
             case I_GROUP:
-                ans_res = insertion_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, to);
+                ans_res = insertion_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, n_prev, to);
             break;
             case R_GROUP:
-                ans_res = non_coding_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, to);
+                ans_res = non_coding_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, n_prev, to);
             break;
             case E_GROUP:
-                ans_res = end_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2);
+                ans_res = end_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, n_prev);
             break;
             case S_GROUP:
-                ans_res = start_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2);
+                ans_res = start_state_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, n_prev);
                 break;
             case M_GROUP_1:
-                ans_res = match_state1_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, whole_genome, to);
+                ans_res = match_state1_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, n_prev, whole_genome, to);
             break;
             case I_GROUP_1:
-                ans_res = insertion_state1_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, to);
+                ans_res = insertion_state1_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, n_prev, to);
             break;
             case E_GROUP_1:
-                ans_res = end_state1_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2);
+                ans_res = end_state1_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, n_prev);
             break;
             case S_GROUP_1:
-                ans_res = start_state1_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2);
+                ans_res = start_state1_prob_eval(hmm_ptr, t, i, curr_res, NULL, -2, n_prev);
             break;
             default:
                 return max_dbl + 1;
@@ -2306,32 +2306,32 @@ double any_state_prob(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, Viter
                 curr_prev_ind = prev_ind[j];
                 switch (group){
                     case M_GROUP:
-                        temp = match_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, whole_genome, to);
+                        temp = match_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, whole_genome, to);
                     break;
                     case I_GROUP:
-                        temp = insertion_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, to);
+                        temp = insertion_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, to);
                     break;
                     case R_GROUP:
-                        temp = non_coding_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, to);
+                        temp = non_coding_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, to);
                     break;
                     case E_GROUP:
-                        temp = end_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind);
+                        temp = end_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
 
                     break;
                     case S_GROUP:
-                        temp = start_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind);
+                        temp = start_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
                     break;
                     case M_GROUP_1:
-                        temp = match_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, whole_genome, to);
+                        temp = match_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, whole_genome, to);
                     break;
                     case I_GROUP_1:
-                        temp = insertion_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, to);
+                        temp = insertion_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, to);
                     break;
                     case E_GROUP_1:
-                        temp = end_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind);
+                        temp = end_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
                     break;
                     case S_GROUP_1:
-                        temp = start_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind);
+                        temp = start_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
                     break;
                     default:
                         return max_dbl + 1;
@@ -2355,26 +2355,26 @@ double any_state_prob(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, Viter
             int curr_prev_ind = curr_res->curr_column_prev[i];
             switch (group){
                 case M_GROUP:
-                    ans_res = match_state_prob_eval(hmm_ptr, t, i, curr_res,prev_res, curr_prev_ind, whole_genome, to);
+                    ans_res = match_state_prob_eval(hmm_ptr, t, i, curr_res,prev_res, curr_prev_ind, n_prev, whole_genome, to);
                 break;
                 case I_GROUP:
-                    ans_res = insertion_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, to);
+                    ans_res = insertion_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, to);
                 break;
                 case R_GROUP:
-                    ans_res = non_coding_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, to);
+                    ans_res = non_coding_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, to);
                 break;
                 case E_GROUP:
-                    ans_res = end_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind);
+                    ans_res = end_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
 
                 break;
                 case S_GROUP:
-                    ans_res = start_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind);
+                    ans_res = start_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
                 break;
                 case E_GROUP_1:
-                    ans_res = end_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind);
+                    ans_res = end_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
                 break;
                 case S_GROUP_1:
-                    ans_res = start_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind);
+                    ans_res = start_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
                 break;
                 default:
                     return max_dbl + 1;
@@ -2416,7 +2416,7 @@ int  count_from2(int t, char *O, int seq_len, char *prev_O, int prev_seq_len){
     return (prev2 == -1 ? 2 : nt2int(prev2)) * 4 + nt2int(prev1);
 }
 
-TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_ind, int whole_genome, int to) {
+TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_ind, int n_prev, int whole_genome, int to) {
 
     double max_dbl = 10000000000.0;
     TmpResult ans_res, temp;
@@ -2425,7 +2425,7 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
     char* O = curr_res->O, *prev_O;// = prev_res ? prev_res[prev_ind].O : NULL;
     int *temp_i = curr_res->temp_i, *prev_temp_i; //= prev_res ? prev_res[prev_ind].temp_i : NULL;
 
-    if (t == 0 && !prev_res){
+    if (t == 0 && n_prev == 0){
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.alpha2 = 0;
         ans_res.path = 0;
@@ -2576,7 +2576,7 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
         ///
         prev_temp_i = (t == 0 && curr_res->curr_column_prev[j + 1] >= 0) ? prev_res[curr_res->curr_column_prev[j + 1]].temp_i : NULL;
 
-        if (t < 2 && !prev_res){
+        if (t < 2 && n_prev == 0){
 
         } else { //t >= 2 || prev_res
             prev1 = (curr_res->curr_column_prev[j + 1] < 0) ? O[temp_i[j - I1_STATE]] : // если нет предыдущего
@@ -2615,7 +2615,7 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 }
 
 
-TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int whole_genome, int to) {
+TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev, int whole_genome, int to) {
     double max_dbl = 10000000000.0, temp_alpha;
     TmpResult ans_res;
     int j, num_d;
@@ -2624,7 +2624,7 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
     int *temp_i_1 = curr_res->temp_i_1, *prev_temp_i_1;// = prev_res ? prev_res[prev_index].temp_i_1 : NULL;
     int prev_seq_len;// = prev_res ? prev_res[prev_index].len_seq : -1;
 
-    if (t == 0 && !prev_res) {
+    if (t == 0 && n_prev == 0) {
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.alpha2 = 0;
         ans_res.path = 0;
@@ -2770,7 +2770,7 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
             }
             prev_temp_i_1 = (t == 0 && curr_res->curr_column_prev[j + 1] >= 0) ? prev_res[curr_res->curr_column_prev[j + 1]].temp_i_1 : NULL;
             from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
-            if (t < 2 && !prev_res) {
+            if (t < 2 && n_prev > 0) {
 
             } else {
                 prev1 = (curr_res->curr_column_prev[j + 1] < 0) ? O[temp_i_1[j - I1_STATE_1]] :
@@ -2808,15 +2808,15 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
     return ans_res;
 }
 
-TmpResult insertion_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int to){
+TmpResult insertion_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev, int to){
     double max_dbl = 10000000000.0;
     TmpResult ans_res, temp;
     int j, from;
-    if (!prev_res && t == 0){
+    if (n_prev == 0 && t == 0){
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.path = 0;
         ans_res.prev_ind = -1;
-    } else if (t == 0 && prev_res) {
+    } else if (t == 0 && n_prev > 0) {
         ans_res.prev_ind = prev_index;
         int prev_seq_len = prev_res[prev_index].len_seq;
         //from I
@@ -2866,20 +2866,20 @@ TmpResult insertion_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *c
     return ans_res;
 }
 
-TmpResult insertion_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int to){
+TmpResult insertion_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev, int to){
     double max_dbl = 10000000000.0, alpha1, temp_alpha;
     double **alpha = curr_res->alpha, **prev_alpha ;//= prev_res ? prev_res[prev_index].alpha : NULL;
     TmpResult ans_res;
     char *prev_O;// = prev_res ? prev_res[prev_index].O : NULL;
     int j, from, prev_seq_len;// = prev_res ? prev_res[prev_index].len_seq : -1;
     int **path = curr_res->path, **prev_path;// = prev_res ? prev_res[prev_index].path : NULL;
-    if (!prev_res && t ==0){
+    if (n_prev == 0 && t ==0){
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.path = 0;
         ans_res.alpha2 = 0;
         ans_res.prev_ind = -1;
     } else if (t >= 5 ||
-               (prev_res &&
+               (n_prev > 0 &&
                 curr_res->curr_column_prev[i] >= 0 &&
                 curr_res->curr_column_prev[i - I1_STATE_1 + M1_STATE_1 + 1] >= 0 &&
                 prev_res[curr_res->curr_column_prev[i] + 1].len_seq + t >= 5
@@ -2952,20 +2952,17 @@ TmpResult insertion_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
     return ans_res;
 }
 
-TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int to) {
+TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev, int to) {
     double max_dbl = 10000000000.0;
     TmpResult ans_res;
     double temp_alpha, **prev_alpha;
     char *prev_O;
     int j, from, prev_seq_len;
-    if (!prev_res && t == 0){
+    if (n_prev == 0 && t == 0){
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.path = 0;
         ans_res.prev_ind = -1;
-    } else if (t == 0 && prev_res) {
-        //int prev_seq_len = prev_res[prev_index].len_seq;
-        //from = nt2int(prev_res[prev_index].O[prev_seq_len - 1]);
-        //from R
+    } else if (t == 0 && n_prev > 0) {
         j = R_STATE;
         prev_alpha = prev_res[prev_index].alpha;
         prev_seq_len = prev_res[prev_index].len_seq;
@@ -3028,13 +3025,13 @@ TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
     return ans_res;
 }
 
-TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index) {
+TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev) {
     double max_dbl = 10000000000.0;
     TmpResult ans_res;
     double temp_alpha, **alpha = curr_res->alpha;
     char *O = curr_res->O;
 
-    if(!prev_res && t == 0){
+    if(n_prev == 0 && t == 0){
         ans_res.alpha = -hmm_ptr->pi[E_STATE];
         ans_res.path = 0;
         ans_res.prev_ind = -1;
@@ -3135,13 +3132,13 @@ TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_re
     return ans_res;
 }
 
-TmpResult start_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index){
+TmpResult start_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev){
     double max_dbl = 10000000000.0, alpha1;
     TmpResult ans_res;
     double temp_alpha, **alpha = curr_res->alpha, **prev_alpha;// = prev_res ? prev_res[prev_index].alpha : NULL;
     char *O = curr_res->O;
     int len_seq = curr_res->len_seq, prev_seq_len;// = prev_res ? prev_res[prev_index].len_seq : -1;
-    if (!prev_res && t == 0){
+    if (n_prev == 0 && t == 0){
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.alpha2 = 0;
         ans_res.path = 0;
@@ -3222,13 +3219,13 @@ TmpResult start_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
 }
 
 
-TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index){
+TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev){
     double max_dbl = 10000000000.0, alpha1;
     TmpResult ans_res;
     double temp_alpha, **alpha = curr_res->alpha, **prev_alpha;// = prev_res ? prev_res[prev_index].alpha : NULL;
     char *O = curr_res->O, *prev_O;// = prev_res ? prev_res[prev_index].O : NULL;
     int len_seq = curr_res->len_seq, prev_seq_len;// = prev_res ? prev_res[prev_index].len_seq : -1;
-    if (t == 0 && !prev_res){
+    if (t == 0 && n_prev > 0){
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.alpha2 = 0;
         ans_res.path = 0;
@@ -3261,7 +3258,7 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
                //adjustment based on probability distribution
                 double start_freq = 0;
                 int lbound, i;
-                if (!prev_res || t >= 30){
+                if (n_prev == 0 || t >= 30){
                     lbound = min(t, 30);
                     for (i = -lbound; i<= 30; ++i) {
                         if (t + i + 2 < len_seq) {
@@ -3304,12 +3301,12 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
     return ans_res;
 }
 
-TmpResult start_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index) {
+TmpResult start_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev) {
     double max_dbl = 10000000000.0;
     TmpResult ans_res;
     double temp_alpha, **alpha = curr_res->alpha;
     char *O = curr_res->O;
-    if (t == 0 && !prev_res){
+    if (t == 0 && n_prev == 0){
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.path = 0;
         ans_res.prev_ind = -1;
