@@ -3225,7 +3225,7 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
     double temp_alpha, **alpha = curr_res->alpha, **prev_alpha;// = prev_res ? prev_res[prev_index].alpha : NULL;
     char *O = curr_res->O, *prev_O;// = prev_res ? prev_res[prev_index].O : NULL;
     int len_seq = curr_res->len_seq, prev_seq_len;// = prev_res ? prev_res[prev_index].len_seq : -1;
-    if (t == 0 && n_prev > 0){
+    if (t == 0 && n_prev == 0){
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.alpha2 = 0;
         ans_res.path = 0;
