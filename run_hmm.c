@@ -13,6 +13,7 @@
 #define STRINGLEN 4096
 
 #define graph_check
+#define HMM_read_check
 
 typedef struct thread_data
 {
@@ -190,7 +191,21 @@ int main (int argc, char **argv)
     hmm.N=NUM_STATE;
     get_train_from_file(hmm_file, &hmm, mstate_file, rstate_file, nstate_file, sstate_file, pstate_file,s1state_file, p1state_file, dstate_file, &train);
 
-    thread_data td;
+#ifdef HMM_read_check
+    FILE *fdbg = fopen("../bin/hmm_e_M_new.txt", "w");
+    int k;
+    for (i = 0; i < 6; ++i){
+        fprintf(fdbg, "M%d matrix\n", i);
+        for (j = 0; j < 16; ++j){
+            for (k = 0; k < 4; ++k){
+                fprintf(fdbg, "%lf ", hmm.e_M[i][j][k]);
+            }
+            fprintf(fdbg, "\n");
+        }
+    }
+    fclose(fdbg);
+#endif
+
     sprintf(tmp_str, "%s.out", out_header);
     fp_out = fopen(tmp_str, "w");
 

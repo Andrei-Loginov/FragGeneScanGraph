@@ -70,7 +70,6 @@
 #define E_GROUP_1 7
 #define S_GROUP_1 8
 
-#define prev_index_debug
 
 
 typedef struct {
