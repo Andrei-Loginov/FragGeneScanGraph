@@ -813,9 +813,19 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
     FILE *f = fopen(fname, "w");
     if (!f) {
         printf("The file was not opened\n");
-    }
-    print_viterbi(ans.alpha, ans.len_seq, NUM_STATE, f);
+    } else
+        print_viterbi(ans.alpha, ans.len_seq, NUM_STATE, f);
     fclose(f);
+
+    sprintf(fname, "../run_result/with_graph/multiple_edge/%s-new-path.csv", g->head[edge_index]);
+    FILE *f_path = fopen(fname, "w");
+    if (!f_path){
+        printf("The file was not opened\n");
+    } else {
+        print_path(ans.path, ans.len_seq, NUM_STATE, f_path);
+    }
+    fclose(f_path);
+
 #endif
     return ans;
 }
@@ -2951,7 +2961,7 @@ TmpResult insertion_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
     } else  {
         ans_res.alpha = max_dbl;
         ans_res.alpha2 = 0;
-        ans_res.path = 0;
+        ans_res.path = -25;
         ans_res.prev_ind = -1;
     }
     return ans_res;
@@ -3028,6 +3038,8 @@ TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
             ans_res.path = j;
             ans_res.prev_ind = curr_res->curr_column_prev[j + 1];
         }
+
+        ans_res.alpha -= log(0.95);
     } else {
         ans_res.alpha = max_dbl + 1;
         ans_res.path = -2;
