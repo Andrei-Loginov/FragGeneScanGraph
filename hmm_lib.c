@@ -1940,6 +1940,12 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
                     for (i = -lbound; i<= 30; ++i) {
                         if (t + i + 2 < len_seq) {
                             start_freq -= hmm_ptr->tr_E_1[i + 30][trinucleotide(O[t + i], O[t + i + 1], O[t + i + 2])];
+#ifdef E1_state_debug
+                            char c0 = O[t + i], c1 = O[t + i + 1], c2 = O[t + i + 2];
+                            double tr_E_1 = hmm_ptr->tr_E_1[i + 30][trinucleotide(c0, c1, c2)];
+                            i++;
+                            i--;
+#endif
                         }
                     }
                 } else {
