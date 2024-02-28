@@ -1940,12 +1940,7 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
                     for (i = -lbound; i<= 30; ++i) {
                         if (t + i + 2 < len_seq) {
                             start_freq -= hmm_ptr->tr_E_1[i + 30][trinucleotide(O[t + i], O[t + i + 1], O[t + i + 2])];
-#ifdef E1_state_debug
-                            char c0 = O[t + i], c1 = O[t + i + 1], c2 = O[t + i + 2];
-                            double tr_E_1 = hmm_ptr->tr_E_1[i + 30][trinucleotide(c0, c1, c2)];
-                            i++;
-                            i--;
-#endif
+
                         }
                     }
                 } else {
@@ -1960,7 +1955,7 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
                         start_freq -= hmm_ptr->tr_E_1[i + 30][trinucleotide(nt1, nt2, nt3)];
                     }
                 }
-                start_freq /= 61.0 * (31 + lbound);
+                start_freq *= 61.0 / (31 + lbound);
 
                 double h_kd = hmm_ptr->E1_dist[2] * exp(-1*pow(start_freq-hmm_ptr->E1_dist[1],2)/(2*pow(hmm_ptr->E1_dist[0],2)));
                 double r_kd = hmm_ptr->E1_dist[5] * exp(-1*pow(start_freq-hmm_ptr->E1_dist[4],2)/(2*pow(hmm_ptr->E1_dist[3],2)));
