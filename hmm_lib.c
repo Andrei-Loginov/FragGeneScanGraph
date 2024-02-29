@@ -1117,7 +1117,7 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
         ans_res.alpha2 = 0;
         ans_res.path = 0;
         ans_res.prev_ind = -1;
-    } else { //t > 0 || prev_res
+    } else if (curr_res->alpha[i][t] < max_dbl ){ //t > 0 || prev_res
         int from2;
         char prev1, prev2;
         //prev1 = (t >= 1) ? O[t - 1] : (prev_res ? prev_O[prev_seq_len - 1] : -1);
@@ -1139,9 +1139,6 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
             from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
             alpha1 = (t == 0) ? prev_alpha[j][prev_seq_len - 1] : alpha[j][t - 1];
 
-#ifdef M_state_debug
-            double tr_gg = hmm_ptr->tr[TR_GG], tr_mm = hmm_ptr->tr[TR_MM], e_m = hmm_ptr->e_M[0][from2][to];
-#endif
             ans_res.alpha = alpha1 - hmm_ptr->tr[TR_GG] - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[0][from2][to];
             ans_res.path = j;
             ans_res.prev_ind = (t == 0) ? prev_ind : curr_res->curr_column_prev[j + 1];
@@ -1301,6 +1298,11 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 
             }
         }
+    } else {
+        ans_res.alpha = curr_res->alpha[i][t];
+        ans_res.path = i;
+        ans_res.prev_ind = curr_res->curr_column_prev[i + 1];//???;
+        ans_res.alpha2 = (t + 2 < curr_res->len_seq) ? curr_res->alpha[i][t + 2] : 0;
     }
     return ans_res;
 }
