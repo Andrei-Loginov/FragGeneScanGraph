@@ -17,7 +17,7 @@
 //#define match_vertex
 //#define I1_debug
 //#define R_state_debug
-#define E1_state_debug
+//#define E1_state_debug
 
 void dump_memory(void *p, int size);
 
@@ -1044,15 +1044,20 @@ double any_state_prob(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, Viter
                 case M_GROUP:
                     ans_res = match_state_prob_eval(hmm_ptr, t, i, curr_res,prev_res, curr_prev_ind, n_prev, whole_genome, to);
                 break;
+                case M_GROUP_1:
+                    ans_res = match_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, whole_genome, to);
+                break;
                 case I_GROUP:
                     ans_res = insertion_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, to);
+                break;
+                case I_GROUP_1:
+                    ans_res = insertion_state1_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, to);
                 break;
                 case R_GROUP:
                     ans_res = non_coding_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev, to);
                 break;
                 case E_GROUP:
                     ans_res = end_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
-
                 break;
                 case S_GROUP:
                     ans_res = start_state_prob_eval(hmm_ptr, t, i, curr_res, prev_res, curr_prev_ind, n_prev);
@@ -1463,7 +1468,7 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
             }
             prev_temp_i_1 = (t == 0 && curr_res->curr_column_prev[j + 1] >= 0) ? prev_res[curr_res->curr_column_prev[j + 1]].temp_i_1 : NULL;
             from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
-            if (t < 2 && n_prev > 0) {
+            if (t < 2 && n_prev == 0) {
 
             } else {
                 prev1 = (curr_res->curr_column_prev[j + 1] < 0) ? O[temp_i_1[j - I1_STATE_1]] :
