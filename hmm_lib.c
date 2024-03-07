@@ -16,7 +16,7 @@
 //#define R_state_debug
 //#define match_vertex
 //#define I1_debug
-#define R_state_debug
+//#define R_state_debug
 //#define E1_state_debug
 
 void dump_memory(void *p, int size);
@@ -1644,13 +1644,6 @@ TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
         prev_O = prev_res[prev_index].O;
 
         from = nt2int(prev_O[prev_seq_len - 1]);
-#ifdef R_state_debug
-        if (t == 0){
-            double alpha1 = prev_alpha[j][prev_seq_len - 1], tr_rr = hmm_ptr->tr[TR_RR], tr_r_r = hmm_ptr->tr_R_R[from][to];
-            double x = 15;
-            x -= 5;
-        }
-#endif
 
         ans_res.alpha = prev_alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_RR] - hmm_ptr->tr_R_R[from][to];
         ans_res.path = j;
@@ -1673,6 +1666,7 @@ TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
             ans_res.alpha = temp_alpha;
             ans_res.path = j;
         }
+        ans_res.alpha -= log(0.95);
     } else if (t > 0){
         from = nt2int(curr_res->O[t - 1]);
         //from R
@@ -1680,13 +1674,6 @@ TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
         ans_res.alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_RR] - hmm_ptr->tr_R_R[from][to];
         ans_res.path = j;
         ans_res.prev_ind = curr_res->curr_column_prev[j + 1];
-#ifdef R_state_debug
-        if (t == 104){
-            double alpha1 = curr_res->alpha[j][t - 1], tr_rr = hmm_ptr->tr[TR_RR], tr_r_r = hmm_ptr->tr_R_R[from][to];
-            double x = 15;
-            x -= 5;
-        }
-#endif
 
         //from E
         j = E_STATE;
