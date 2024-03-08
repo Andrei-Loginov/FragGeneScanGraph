@@ -151,6 +151,12 @@ typedef struct tmp_result {
     int prev_ind;
 } TmpResult;
 
+typedef struct graph_path {
+    int *vpath;
+    char *O;
+    int seq_len;
+} GraphPath;
+
 int get_prob_from_cg(HMM *hmm, TRAIN *train, char *O); //return cg - 26 Ye April 16, 2016
 int get_prob_form_cg_graph(HMM *hmm_ptr, TRAIN *train_ptr, Graph *g);
 void get_train_from_file(char *filename, HMM *hmm_ptr, char *mfilename, char *mfilename1, char *nfilename, char *sfilename,char *pfilename,char *s1filename,char *p1filename, char *dfilename, TRAIN *train_ptr);
@@ -160,6 +166,8 @@ void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *
 
 ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_genome);
 void viterbi_graph(HMM *hmm_ptr, Graph* g, size_t start_index, int whole_genome);
+GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state);
+
 
 //Optimization refactoring
 int state2group(int i);
@@ -177,7 +185,6 @@ TmpResult start_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 TmpResult start_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev);
 //
 
-double end_state_prob_evaluation(int t, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result);
 
 int count_from2(int t, char *O, int seq_len, char *prev_O, int prev_seq_len);
 
@@ -187,8 +194,6 @@ void get_protein(char *dna, char *protein, int strand, int whole_genome);
 void get_rc_dna(char *dna, char *dna1);
 void get_corrected_dna(char *dna, char *dna_f);
 
-Edge* create_raw_edge(Graph *g);
-Edge* init_skeleton(Graph* g, int curr_edge, Edge* prev_edge);
 
 
 Graph read_graph(FILE* fp, FILE* fp_matr);

@@ -441,6 +441,14 @@ void fprint_dmatrix(double **matr, int nrow, int ncol, char *fname){
     fclose(f);
 }
 
+void swap(int *lhs, int *rhs) {
+    int temp = *lhs;
+    *lhs = *rhs;
+    *rhs = temp;
+    return;
+}
+
+
 void fprint_ivector(int *v, int n, char *fname){
     FILE *f = fopen(fname, "w");
     int i;
@@ -448,5 +456,14 @@ void fprint_ivector(int *v, int n, char *fname){
         fprintf(f, "%d ", v[i]);
     fprintf(f, "\n");
     fclose(f);
+    return;
+}
+
+void print_ivector(int *v, int n) {
+    int i;
+    for (i = 0; i < n; ++i){
+        printf("%d ", v[i]);
+    }
+    printf("\n");
     return;
 }
