@@ -29,15 +29,18 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
     ans.len_seq = g->seq_len[edge_index];
     ans.alpha = dmatrix(NUM_STATE, ans.len_seq);
     ans.path = imatrix(NUM_STATE, ans.len_seq);
-    ans.temp_i = ivector(6);
-    ans.temp_i_1 = ivector(6);
+    ans.temp_i = (int*)malloc(6 * sizeof(int));
+    ans.temp_i_1 = (int*)malloc(6 * sizeof(int));
     int i, t;
+    for (i = 0; i < 6; ++i){
+        ans.temp_i[i] = 0;
+        ans.temp_i_1[i] = 0;
+    }
 
     for (i = -1; i < NUM_STATE; ++i) {
         ans.curr_column_prev[i + 1] = -1;
         ans.first_column_prev[i + 1] = -1;
     }
-
     size_t n_prev= 0 ;
     for (i = 0; i < g->n_edge; ++i){
         if (g->adjacency_matrix[i][edge_index])
@@ -51,7 +54,7 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
             ++counter;
         }
     }
-
+    ans.path[I6_STATE_1][413] = 0;
     for (t = 0; t < ans.len_seq; ++t){
 
         for (i = 0; i < NUM_STATE; ++i){
@@ -59,6 +62,9 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
         }
     }
     free_ivector(prev_indices);
+///
+///Print viterbi matrix and path matrix to files
+///
 #ifdef viterbi_out_flg
     char fname[4096];
     sprintf(fname, "../run_result/with_graph/multiple_edge/%s-new-matrix.csv", g->head[edge_index]);
@@ -77,7 +83,6 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
         print_path(ans.path, ans.len_seq, NUM_STATE, f_path);
     }
     fclose(f_path);
-
 #endif
     return ans;
 }
@@ -1283,6 +1288,12 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
             ans_res.alpha = alpha1 - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i - M1_STATE][from2][to];
             ans_res.path = j;
             ans_res.prev_ind = (t == 0) ? prev_ind : curr_res->curr_column_prev[j + 1];
+#ifdef M_state_debug
+            if (t == 411 && i == M4_STATE){
+                int xx =12;
+                xx += 20;
+            }
+#endif
             //from D
             if (whole_genome == 0) {
                 for (j = M6_STATE; j >= M1_STATE; --j) {
@@ -1354,7 +1365,7 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
                             ( temp_i[j - I1_STATE] > 0 ? O[temp_i[j - I1_STATE] - 1] :
                                 (temp_i[j - I1_STATE] < 0 ? prev_O[-temp_i[j - I1_STATE] - 1] : //проверяем, где был последний match
                                     prev_O[prev_seq_len - 1])));
-                if ((i == M3_STATE && i == M6_STATE) && prev2 == 'T' &&
+                if ((i == M3_STATE || i == M6_STATE) && prev2 == 'T' &&
                         ((prev1 == 'A' && O[t] == 'A') ||
                          (prev1 == 'A' && O[t] == 'G') ||
                          (prev1 == 'G' && O[t] == 'A'))){
@@ -1377,6 +1388,12 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
         ans_res.prev_ind = curr_res->curr_column_prev[i + 1];//???;
         ans_res.alpha2 = (t + 2 < curr_res->len_seq) ? curr_res->alpha[i][t + 2] : 0;
     }
+#ifdef M_state_debug
+    if (i == M4_STATE && (t >= 410)){
+        int yy = 5;
+        --yy;
+    }
+#endif
     return ans_res;
 }
 
@@ -1612,7 +1629,6 @@ TmpResult insertion_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *c
         ans_res.alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
         ans_res.path = j;
         ans_res.prev_ind = curr_res->curr_column_prev[j];
-
         //from M
         j = i - I1_STATE + M1_STATE;
         if (i == I6_STATE) {
@@ -1624,7 +1640,7 @@ TmpResult insertion_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *c
             ans_res.alpha = temp.alpha;
             ans_res.path = j;
             ans_res.prev_ind = curr_res->curr_column_prev[j];
-            curr_res->temp_i[j - I1_STATE] = t - 1;
+            curr_res->temp_i[i - I1_STATE] = t - 1;
         }
     } else {
         ans_res.alpha = max_dbl + 1;
