@@ -208,6 +208,7 @@ int main (int argc, char **argv)
 
     sprintf(tmp_str, "%s.out", out_header);
     fp_out = fopen(tmp_str, "w");
+    printf("fp_out path: %s\n", tmp_str);
 
     if (!fp_out) {
         printf("Can't open out file %s\n", tmp_str);
@@ -240,10 +241,10 @@ int main (int argc, char **argv)
     cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
     viterbi_graph(&hmm, &g, 0, wholegenome);
     fprint_imatrix(g.adjacency_matrix, g.n_edge, g.n_edge, "some_out_file.txt");
-    GraphPath ans = restore_path(g.edge_results, &g, 0, NUM_STATE);
+    GraphPath ans = restore_path(g.edge_results, &g, 1, NUM_STATE);
     printf("%s\n", ans.O);
     print_ivector(ans.vpath, ans.seq_len);
-
+    backtrack_graph_path(&hmm, &train, fp_out, fp_aa, fp_dna, "some_head", wholegenome, cg_count, format, &ans);
     free_graph(&g);
 
     fclose(fp);

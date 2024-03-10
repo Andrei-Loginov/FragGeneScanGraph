@@ -37,3 +37,6 @@ void fprint_imatrix(int **matr, int nrow, int ncol, char *fname);
 void fprint_dmatrix(double **matr, int nrow, int ncol, char *fname);
 void fprint_ivector(int *v, int n, char *fname);
 void print_ivector(int *v, int n);
+
+void get_rc_dna(char *dna, char *dna1);
+void get_rc_dna_indel(char *dna, char *dna1);

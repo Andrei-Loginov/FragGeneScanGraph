@@ -154,6 +154,7 @@ typedef struct tmp_result {
 typedef struct graph_path {
     int *vpath;
     char *O;
+    double *alpha;
     int seq_len;
 } GraphPath;
 
@@ -163,6 +164,9 @@ void get_train_from_file(char *filename, HMM *hmm_ptr, char *mfilename, char *mf
 ViterbiResult viterbi(HMM *hmm_ptr, char *O, int whole_genome, ViterbiResult *prev_result, char* head);
 void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,char *head, int whole_genome, int cg, int format,
                ViterbiResult *viterbi_result);
+
+void backtrack_graph_path(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,char *head, int whole_genome, int cg, int format,
+               GraphPath *gp);
 
 ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_genome);
 void viterbi_graph(HMM *hmm_ptr, Graph* g, size_t start_index, int whole_genome);

@@ -98,64 +98,394 @@ void viterbi_graph(HMM *hmm_ptr, Graph* g, size_t start_index, int whole_genome)
 
 GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
     /*Find end of the most likely path*/
-    int i, j, t, curr_prev, curr_edge = start;
+    int i, j, t, curr_edge, vertex_path;
     GraphPath ans;
     ans.seq_len = 0;// = res[start].len_seq;
-    int *vpath, *edge_path, edge_counter = 0;
-    curr_prev = -1;
-    do {
-        ++edge_counter;
-        int curr_len_seq = res[curr_edge].len_seq;
-        int **curr_path = res[curr_edge].path;
-        int *curr_edge_vpath = (int*)malloc(curr_len_seq * sizeof(int));
-        ans.seq_len += curr_len_seq;
-        if (edge_counter == 1) {
-            double **alpha = res[start].alpha;
-            edge_path = (int*)malloc(sizeof(int));
-            vpath = (int*)malloc(curr_len_seq * sizeof(int));
-            curr_edge_vpath[0] = 0;
+    int **vpath, *edge_path, edge_counter = 0, curr_len_seq;
+    double **alpha;
+    curr_edge = start;
+    vpath = (int**)malloc(g->n_edge * sizeof(int*));
+    edge_path = (int*)malloc(g->n_edge * sizeof(int));
+    alpha = (double**)malloc(g->n_edge * sizeof(double*));
+    while (curr_edge != -1){
+        ans.seq_len += res[curr_edge].len_seq;
+        vpath[edge_counter] = (int*)malloc(res[curr_edge].len_seq * sizeof(int));
+        alpha[edge_counter] = (double*)malloc(res[curr_edge].len_seq * sizeof(double));
+        edge_path[edge_counter] = curr_edge;
+        curr_len_seq = res[curr_edge].len_seq;
+
+        if (edge_counter == 0){ //the last edge
+            vpath[edge_counter][curr_len_seq - 1] = 0;
             for (i = 0; i < num_state; ++i){
-                if (alpha[i][curr_len_seq - 1] < alpha[curr_edge_vpath[0]][curr_len_seq - 1]){
-                    curr_edge_vpath[0] = i;
+                if (res[curr_edge].alpha[i][curr_len_seq - 1] < res[curr_edge].alpha[vpath[edge_counter][curr_len_seq - 1]][curr_len_seq - 1]) {
+                    vpath[edge_counter][curr_len_seq - 1] = i;
                 }
             }
-        } else { //watch at previous edge
-            edge_path = (int*)realloc(edge_path, sizeof(int));
-            vpath = (int*)realloc(vpath, curr_len_seq * sizeof(int));
-            curr_edge_vpath[0] = vpath[ans.seq_len - curr_len_seq - 1];
+        } else {
+            vpath[edge_counter][curr_len_seq - 1] = vertex_path;
         }
-        edge_path[edge_counter - 1] = curr_edge;
-        for (t = 1; t < curr_len_seq; ++t) {
-            curr_edge_vpath[t] = curr_path[curr_edge_vpath[t - 1]][curr_len_seq - t - 1];
+        alpha[edge_counter][curr_len_seq - 1] = res[curr_edge].alpha[vpath[edge_counter][curr_len_seq - 1]][curr_len_seq - 1];
+        for (t = curr_len_seq - 2; t >= 0; --t){
+            vpath[edge_counter][t] = res[curr_edge].path[vpath[edge_counter][t + 1]][t + 1];
+            alpha[edge_counter][t] = res[curr_edge].alpha[vpath[edge_counter][t]][t];
         }
-        curr_edge = res[curr_edge].first_column_prev[curr_edge_vpath[curr_len_seq - 1] + 1];
-        for (t = 0; t < curr_len_seq; ++t){
-            vpath[ans.seq_len - curr_len_seq + t] = curr_edge_vpath[t];
-        }
-        free(curr_edge_vpath);
-    } while (curr_edge >= 0);
-    printf("Path length: %d\n",ans.seq_len);
-    /*ans.vpath = (int*)malloc(ans.seq_len * sizeof(int));
-    for (i = 0; i < ans.seq_len; ++i){
-        ans.vpath[i] = vpath[ans.seq_len - i - 1];
-    }*/
-    ans.vpath = vpath;
-    for (i = 0; i < ans.seq_len / 2; ++i){
-        swap(&(ans.vpath[i]), &(ans.vpath[ans.seq_len - i - 1]));
+        vertex_path = res[curr_edge].path[vpath[edge_counter][0]][0];
+        curr_edge = res[curr_edge].curr_column_prev[vpath[edge_counter][curr_len_seq - 1] + 1];
+        printf("New curr_edge = %d\n", curr_edge);
+        ++edge_counter;
     }
+    ans.vpath = (int*)malloc(ans.seq_len * sizeof(int));
+    ans.alpha = (double*)malloc(ans.seq_len * sizeof(double));
     ans.O = (char*)malloc(ans.seq_len + 1);
     ans.O[ans.seq_len] = '\0';
     int counter = 0;
     for (i = edge_counter - 1; i >= 0; --i){
-        for (j = 0; j < res[edge_path[i]].len_seq; ++j){
+        for (j = 0; j < res[edge_path[i]].len_seq; ++j, ++counter){
+            ans.vpath[counter] = vpath[i][j];
+            ans.alpha[counter] = alpha[i][j];
             ans.O[counter] = res[edge_path[i]].O[j];
-            ++counter;
         }
     }
-    //printf("%s\n", ans.O);
+    for (i = 0; i < edge_counter; ++i){
+        free(vpath[i]);
+        free(alpha[i]);
+    }
+    free(vpath);
+    free(alpha);
     free(edge_path);
-    //free(vpath);
     return ans;
+}
+
+void backtrack_graph_path(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,char *head, int whole_genome, int cg, int format,
+                          GraphPath *gp){
+    char *head_short=NULL;
+    char delimi[] = " ";
+    double max_dbl = 10000000000.0;
+    double prob = max_dbl, final_score;
+    double *alpha = gp->alpha;
+    //int **path = viterbi_result->path;
+    int i, j, t, kk, len_seq = gp->seq_len;
+    char *O = gp->O;
+    int *vpath = gp->vpath;
+    int print_save, codon_start;
+    int start_t, dna_start_t;
+
+    char dna_tmp[300000];
+    char dna[300010];
+    char dna1[300010];
+    char dna_f[300010];
+    char dna_f1[300010];
+    char protein[100000];
+    int dna_id=0, dna_f_id=0;
+
+    int insert[100];
+    int delete[100];
+    int insert_id, delete_id;
+
+    int start_orf, prev_match, frame;
+    int end_t, temp_t;
+    int out_nt;
+
+    int gene_len, refine = 0;
+    if (whole_genome==1){
+        gene_len = 120;
+        refine = 1;
+    } else {
+        gene_len = 60;
+    }
+
+    head_short = strtok(head, delimi);
+    fprintf(fp_out, "%s\n", head_short); //use head_short, Ye, April 22, 2016
+
+
+
+    print_save = 0;
+    codon_start=0;
+    start_t=-1;
+
+    int glen = strlen(O);
+    char codon[4], utr[65];
+    for (t=0; t<len_seq; t++){
+
+        if (codon_start==0 && start_t < 0 &&
+           ((vpath[t]>=M1_STATE && vpath[t]<=M6_STATE) ||
+           (vpath[t]>=M1_STATE_1 && vpath[t]<=M6_STATE_1) ||
+           vpath[t] == S_STATE || vpath[t] == S_STATE_1 ))
+        {
+            start_t=t+1;
+            //printf("Note assign start_t %d (t=%d vpath %d)\n", start_t, t, vpath[t]);
+        }
+
+        if (codon_start==0 &&
+           (vpath[t]==M1_STATE || vpath[t]==M4_STATE ||
+           vpath[t]==M1_STATE_1 || vpath[t]==M4_STATE_1)) {
+
+            memset(dna,0,300000);
+            memset(dna1,0,300000);
+            memset(dna_f,0,300000);
+            memset(dna_f1,0,300000);
+            memset(protein,0, 100000);
+            memset(insert,0,100);
+            memset(delete,0,100);
+
+            insert_id = 0;
+            delete_id = 0;
+            dna_id = 0;
+            dna_f_id = 0;
+            dna[dna_id] = O[t];
+            dna_start_t = t + 1; //Ye April 21, 2016
+            dna_f[dna_f_id] = O[t];
+            //printf("Note start dna: t = %d, dna_id %d, dna_f_id %d, add %c\n", t, dna_id, dna_f_id, O[t]);
+            start_orf= t + 1;
+            prev_match = vpath[t];
+
+            if (vpath[t] < M6_STATE){
+                codon_start=1;
+            }else{
+                codon_start=-1;
+            }
+
+        } else if (codon_start!=0 && (vpath[t]==E_STATE || vpath[t]==E_STATE_1 || t==len_seq-1)){
+
+            if (vpath[t]==E_STATE || vpath[t]==E_STATE_1){
+                end_t = t + 3;
+            } else {
+                end_t = t + 1;
+
+                /* FGS1.12 start: remove incomplete codon */
+                temp_t = t;
+                while(vpath[temp_t] != M1_STATE && vpath[temp_t] != M4_STATE  &&
+                        vpath[temp_t] != M1_STATE_1  && vpath[temp_t] != M4_STATE_1){
+
+                    dna_f[dna_f_id] = '\0';
+                    dna_f_id--;
+
+                    dna[dna_id] = '\0';
+                    dna_id--;
+
+                    temp_t--;
+                }
+            /* FGS1.12 end: remove incomplete codon */
+            }
+            final_score = (alpha[end_t-4]- alpha[start_t+2] ) / (end_t-start_t-5);
+            frame = start_orf % 3;
+            if (frame == 0){
+                frame = 3;
+            }
+
+            if (dna_id > gene_len  ){
+                if (codon_start == 1){
+                    if(start_t == dna_start_t - 3) { //add complete start codon to dna, Ye April 21, 2016
+                        strcpy(dna_tmp, dna);
+                        sprintf(dna, "%c%c%c%s", O[start_t - 1], O[start_t], O[start_t + 1], dna_tmp);
+                        //printf("add start codon to dna: %c%c%c\n", O[start_t-1], O[start_t], O[start_t+1]);
+                        //printf("old dna %d %s\n", strlen(dna_tmp), dna_tmp);
+                        //printf("new dna %d %s\n", strlen(dna), dna);
+                    }
+                    if( refine ) { //add refinement of the start codons here, Ye, April 16, 2016
+                        int start_old = start_t;
+                        codon[0] = 0;
+                        strncpy(codon, O + start_old - 1, 3);
+                        codon[3] = 0;
+                        int s = 0;
+                        //find the optimal start codon within 30bp up- and downstream of start codon
+                        double e_save;
+                        int s_save;
+                        while( ( ! (!strcmp(codon, "TAA") || !strcmp(codon, "TAG") || !strcmp(codon, "TGA")) ) && (start_old-1-s-35>=0)) {
+                            if(!strcmp(codon, "ATG") || !strcmp(codon, "GTG") || !strcmp(codon, "TTG")) {
+                                utr[0] = 0;
+                                strncpy(utr, O+start_old-1-s-30,63);
+                                utr[63] = 0;
+                                //printf("check s=%d, codon %s\n", s, codon);
+                                double freq_sum = 0;
+                                for(j = 0; j < strlen(utr) - 2; j ++) {
+                                    int idx = trinucleotide(utr[j], utr[j+1], utr[j+2]);
+                                    freq_sum -= train_ptr->start[cg][j][idx];
+                                    //printf("j=%d, key=%c%c%c %d, start %lf\n", j, utr[j], utr[j+1], utr[j+2], idx, train_ptr->start[cg][j][idx]);
+                                }
+                                if(s == 0) {
+                                    e_save = freq_sum;
+                                    s_save = s;
+                                }
+                                else if(freq_sum < e_save) {
+                                    e_save = freq_sum;
+                                    s_save = -1 * s;
+                                }
+                                //printf("s=%d freq_sum %lf\n", s, freq_sum);
+                                //getchar();
+                            }
+                            s += 3;
+                            codon[0] = 0;
+                            strncpy(codon, O+start_old-1-s, 3);
+                            codon[3] = 0;
+                        }
+                        start_t = start_old+s_save;
+                        //update dna
+                        if(s_save != 0) {
+                            //printf("start refined + %d -> %d\n", start_old, start_t);
+                            dna[0] = 0;
+                            strncpy(dna, O + start_t - 1, end_t - start_t + 1);
+                            dna[end_t - start_t + 1] = 0;
+                        }
+                    }
+                    fprintf(fp_out, "%d\t%d\t+\t%d\t%lf\t", start_t, end_t, frame, final_score);
+                    fprintf(fp_out, "I:");
+                    for (i=0; i<insert_id; i++){
+                        fprintf(fp_out, "%d,", insert[i]);
+                    }
+                    fprintf(fp_out, "\tD:");
+                    for (i=0; i<delete_id; i++){
+                        fprintf(fp_out, "%d,", delete[i]);
+                    }
+                    fprintf(fp_out, "\n");
+
+                    fprintf(fp_aa, "%s_%d_%d_+\n", head_short, start_t, end_t);
+                    fprintf(fp_dna, "%s_%d_%d_+\n", head_short, start_t, end_t);
+
+                    //printf("dna-start %c%c%c exp %c%c%c (%c%c%c)\n", dna[0], dna[1], dna[2], O[start_t-1], O[start_t], O[start_t+1], O[start_t+2], O[start_t+3], O[start_t+4]);
+                    //printf("dna-len %d start_t %d end_t %d exp-len %d diff %d\n", strlen(dna), start_t, end_t, end_t - start_t + 1, end_t - start_t + 1 - strlen(dna));
+                    get_protein(dna,protein,1, whole_genome);
+                    fprintf(fp_aa, "%s\n", protein);
+                    if (format==0){
+                        fprintf(fp_dna, "%s\n", dna);
+                    }else if (format==1){
+                        fprintf(fp_dna, "%s\n", dna_f);
+                    }
+                } else if (codon_start==-1){
+                    //printf("reverse strand dna-len %d, start_t %d, dna_start %d, add-up %d, end_t %d\n", strlen(dna), start_t, dna_start_t, dna_start_t + strlen(dna), end_t);
+                    //getchar();
+                    if(dna_start_t + strlen(dna) == end_t - 2) { //add complete start codon (on reverse strand) to dna, Ye April 21, 2016
+                        strcpy(dna_tmp, dna);
+                        sprintf(dna, "%s%c%c%c", dna_tmp, O[end_t-3], O[end_t-2], O[end_t-1]);
+                        //printf("add start codon on the reverse strand to dna: %c%c%c\n", O[end_t-3], O[end_t-2], O[end_t-1]);
+                    }
+                    if(refine) { //add refinement of the start codons here, Ye, April 16, 2016
+                        int end_old = end_t; //reverse
+                        codon[0] = 0;
+                        strncpy(codon, O + end_t-1-2, 3);
+                        codon[3] = 0;
+                        int s = 0;
+                        //find the optimal start codon within 30bp up- and downstream of start codon
+                        double e_save;
+                        int s_save;
+                        while((!(!strcmp(codon, "TTA") || !strcmp(codon, "CTA") || !strcmp(codon, "TCA"))) && (end_old-2+s+35 < glen)) {
+                            if(!strcmp(codon, "CAT") || !strcmp(codon, "CAC") || !strcmp(codon, "CAA")) {
+                                utr[0] = 0;
+                                strncpy(utr, O+end_old-1-2+s-30,63);
+                                utr[63] = 0;
+                                //printf("check s=%d, codon %s\n", s, codon);
+                                double freq_sum = 0;
+                                for(j = 0; j < strlen(utr) - 2; j ++) {
+                                    int idx = trinucleotide(utr[j], utr[j+1], utr[j+2]);
+                                    freq_sum -= train_ptr->stop1[cg][j][idx]; //stop1?? Ye, April 18, 2016
+                                    //printf("j=%d, key=%c%c%c %d, stop1 %lf\n", j, utr[j], utr[j+1], utr[j+2], idx, train_ptr->stop1[cg][j][idx]);
+                                }
+                                if(s == 0) {
+                                    e_save = freq_sum;
+                                    s_save = s;
+                                } else if( freq_sum < e_save ) {
+                                    e_save = freq_sum;
+                                    s_save = s;
+                                }
+                                //printf("s=%d freq_sum %lf\n", s, freq_sum);
+                                //getchar();
+                            }
+                            s += 3;
+                            codon[0] = 0;
+                            strncpy(codon, O+end_old-1-2+s, 3);
+                            codon[3] = 0;
+                        }
+                        end_t = end_old+s_save;
+                        //update dna
+                        if(s_save != 0) {
+                            //printf("start refined - end %d -> %d\n", end_old, end_t);
+                            dna[0] = 0;
+                            strncpy(dna, O + start_t - 1, end_t - start_t + 1);
+                            dna[end_t - start_t + 1] = 0;
+                        }
+                    }
+
+                    fprintf(fp_out, "%d\t%d\t-\t%d\t%lf\t", start_t, end_t, frame, final_score);
+                    fprintf(fp_out, "I:");
+                    for (i=0; i<insert_id; i++){
+                        fprintf(fp_out, "%d,", insert[i]);
+                    }
+                    fprintf(fp_out, "\tD:");
+                    for (i=0; i<delete_id; i++){
+                        fprintf(fp_out, "%d,", delete[i]);
+                    }
+                    fprintf(fp_out, "\n");
+
+                    fprintf(fp_aa, "%s_%d_%d_-\n", head_short, start_t, end_t);
+                    fprintf(fp_dna, "%s_%d_%d_-\n", head_short, start_t, end_t);
+
+                    get_protein(dna,protein,-1, whole_genome);
+                    get_rc_dna(dna, dna1);
+                    get_rc_dna_indel(dna_f, dna_f1);
+                    fprintf(fp_aa, "%s\n", protein);
+                    if (format==0){
+                        fprintf(fp_dna, "%s\n", dna1);
+                    }else if (format==1){
+                        fprintf(fp_dna, "%s\n", dna_f1);
+                    }
+                }
+            }
+            codon_start=0;
+            start_t = -1;
+            end_t = -1;
+            dna_id = 0;
+            dna_f_id = 0;
+
+        } else if (codon_start!=0 &&
+          ((vpath[t]>=M1_STATE && vpath[t]<=M6_STATE) ||
+           (vpath[t]>=M1_STATE_1 && vpath[t]<=M6_STATE_1)) &&
+           vpath[t]-prev_match<6) {
+
+            if (vpath[t] < prev_match){
+                out_nt = vpath[t]+6-prev_match;
+            } else {
+                out_nt = vpath[t]-prev_match;
+            }
+            for (kk=0; kk<out_nt; kk++){   /* for deleted nt in reads */
+                dna_id ++;
+                dna[dna_id] = 'N';
+                //printf("dna_id %d, dna-len %d\n", dna_id, strlen(dna));
+                dna_f_id ++;
+                dna_f[dna_f_id] = 'x';
+                if (kk>0){
+                    delete[delete_id]=t+1;
+                    delete_id++;
+                }
+            }
+            dna[dna_id]=O[t];
+            //printf("dna_id %d, add %d %c dna-len %d\n", dna_id, t, O[t], strlen(dna));
+            dna_f[dna_f_id]=O[t];
+            prev_match = vpath[t];
+
+        } else if (codon_start!=0 &&
+          ((vpath[t]>=I1_STATE && vpath[t]<=I6_STATE) ||
+           (vpath[t]>=I1_STATE_1 && vpath[t]<=I6_STATE_1))) {
+
+            dna_f_id ++;
+            dna_f[dna_f_id] = tolower(O[t]);
+            insert[insert_id]=t+1;
+            insert_id++;
+
+        } else if (codon_start!=0 && vpath[t]==R_STATE) {
+            /* for long NNNNNNNNN, pretend R state */
+            codon_start=0;
+            start_t=-1;
+            end_t = -1;
+            dna_id=0;
+            dna_f_id=0;
+
+        }
+    }
+#ifdef viterbi_out_flg
+    printf("End of viterbi\n");
+#endif
+    free_ivector(vpath);
+    return;
 }
 
 void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *fp_dna,char *head, int whole_genome, int cg, int format,
@@ -500,8 +830,6 @@ void backtrack(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp_aa, FILE *
 #ifdef viterbi_out_flg
     printf("End of viterbi\n");
 #endif
-    //free_dmatrix(alpha, hmm_ptr->N);
-    //free_imatrix(path, hmm_ptr->N);
     free_ivector(vpath);
     return;
 }
