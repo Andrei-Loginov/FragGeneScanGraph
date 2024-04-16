@@ -239,7 +239,7 @@ int main (int argc, char **argv)
     g = read_graph(fp, fp_matr);
     //ViterbiResult* results = (ViterbiResult*)malloc(g.n_edge * sizeof(ViterbiResult));
     cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
-    viterbi_graph(&hmm, &g, 0, wholegenome);
+    viterbi_graph(&hmm, &g, wholegenome);
     fprint_imatrix(g.adjacency_matrix, g.n_edge, g.n_edge, "some_out_file.txt");
     GraphPath ans = restore_path(g.edge_results, &g, 1, NUM_STATE);
     printf("%s\n", ans.O);
