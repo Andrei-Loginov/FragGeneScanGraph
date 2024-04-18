@@ -133,6 +133,7 @@ typedef struct {
     size_t overlap;
     int** adjacency_matrix;
     int* seq_len;
+    int* dead_end_flg;
     char** obs_seq;
     char** head;
     ViterbiResult *edge_results;

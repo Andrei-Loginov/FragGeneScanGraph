@@ -48,17 +48,27 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
     }
     int *prev_indices = ivector(n_prev);
     size_t counter = 0;
+    g->dead_end_flg[edge_index] = 1;
     for (i = 0; i < g->n_edge; ++i){
         if (g->adjacency_matrix[i][edge_index]){
             prev_indices[counter] = i;
             ++counter;
         }
+        if (g->adjacency_matrix[edge_index][i]){
+            g->dead_end_flg[edge_index] = 0;
+        }
     }
+    printf("endge = %d\tdead_end_flg = %d\n", edge_index, g->dead_end_flg[edge_index]);
     ans.path[I6_STATE_1][413] = 0;
-    for (t = 0; t < ans.len_seq; ++t){
-
+    int rbound = ans.len_seq;
+    if (!g->dead_end_flg[edge_index]){
+        rbound -= g->overlap;
+    }
+    for (t = 0; t < rbound; ++t){
+        //printf("edge = %d\tt = %d; ", edge_index, t);
         for (i = 0; i < NUM_STATE; ++i){
             ans.alpha[i][t] = any_state_prob(hmm_ptr, t, i, &ans, g->edge_results, prev_indices, n_prev, g->overlap, whole_genome);
+
         }
     }
     free_ivector(prev_indices);
@@ -93,16 +103,9 @@ void viterbi_graph(HMM *hmm_ptr, Graph* g, int whole_genome) {
     g->edge_results = (ViterbiResult*)malloc(g->n_edge * sizeof (ViterbiResult));
     size_t i;
     for (i = 0; i < g->n_edge; ++i){
-        //printf("i = %d, order[i] = %d\n", i, order[i]);
         g->edge_results[order[i]] = viterbi_edge(hmm_ptr, g, order[i], whole_genome);
     }
     free(order);
-    /*g->edge_results = (ViterbiResult*)malloc(g->n_edge * sizeof (ViterbiResult));
-    size_t i;
-    for (i = 0; i < g->n_edge; ++i){
-        g->edge_results[i] = viterbi_edge(hmm_ptr, g, i, whole_genome);
-    }
-    */
 }
 
 GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
@@ -117,11 +120,11 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
     edge_path = (int*)malloc(g->n_edge * sizeof(int));
     alpha = (double**)malloc(g->n_edge * sizeof(double*));
     while (curr_edge != -1){
-        ans.seq_len += res[curr_edge].len_seq;
+        ans.seq_len += (g->dead_end_flg[curr_edge]) ? res[curr_edge].len_seq : res[curr_edge].len_seq - g->overlap;
         vpath[edge_counter] = (int*)malloc(res[curr_edge].len_seq * sizeof(int));
         alpha[edge_counter] = (double*)malloc(res[curr_edge].len_seq * sizeof(double));
         edge_path[edge_counter] = curr_edge;
-        curr_len_seq = res[curr_edge].len_seq;
+        curr_len_seq = (g->dead_end_flg[curr_edge]) ? res[curr_edge].len_seq : res[curr_edge].len_seq - g->overlap;
 
         if (edge_counter == 0){ //the last edge
             vpath[edge_counter][curr_len_seq - 1] = 0;
@@ -149,7 +152,7 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
     ans.O[ans.seq_len] = '\0';
     int counter = 0;
     for (i = edge_counter - 1; i >= 0; --i){
-        for (j = 0; j < res[edge_path[i]].len_seq; ++j, ++counter){
+        for (j = 0; j < (g->dead_end_flg[edge_path[i]] ? res[edge_path[i]].len_seq : res[edge_path[i]].len_seq - g->overlap); ++j, ++counter){
             ans.vpath[counter] = vpath[i][j];
             ans.alpha[counter] = alpha[i][j];
             ans.O[counter] = res[edge_path[i]].O[j];
@@ -1168,6 +1171,7 @@ Graph read_graph(FILE *fp, FILE *fp_matr){
     }
 
     res.seq_len = (int*)malloc(res.n_edge * sizeof (int));
+    res.dead_end_flg = (int*)malloc(res.n_edge * sizeof(int));
     res.head = (char**)malloc(res.n_edge * sizeof(char*));
     res.obs_seq = (char**)malloc(res.n_edge * sizeof(char*));
 
@@ -1245,109 +1249,6 @@ void free_graph(Graph *g){
 
 
 
-double end_state_prob_evaluation(int t, HMM *hmm_ptr, ViterbiResult *curr_res, ViterbiResult *prev_result) {
-    double **alpha = curr_res->alpha, ans, temp_alpha, tmp_path, max_dbl = 10000000000.0;
-    int **path = curr_res->path, seq_len = curr_res->len_seq;
-    int prev_seq_len = (prev_result) ? prev_result->len_seq : 0;
-    char *O = curr_res->O;
-
-    if (!prev_result && t == 0) {
-        curr_res->alpha[E_STATE][0] = -hmm_ptr->pi[E_STATE];
-        return curr_res->alpha[E_STATE][0];
-    } else { //t > 0 || (t == 0 && prev_result)
-        if (alpha[E_STATE][t] == 0){
-
-            alpha[E_STATE][t] = max_dbl;
-            path[E_STATE][t] = NOSTATE;
-
-            if (t < seq_len - 2 && O[t] == 'T' &&
-                ((O[t + 1] == 'A' && O[t + 2] == 'A') ||
-                 (O[t + 1] == 'A' && O[t + 2] == 'G') ||
-                 (O[t + 1] == 'G' && O[t + 2] == 'A'))){
-
-                alpha[E_STATE][t + 2] = max_dbl;
-                //transition from M6
-                if (t == 0) {
-                    temp_alpha = prev_result->alpha[M6_STATE][prev_seq_len - 1] - hmm_ptr->tr[TR_GE];
-                } else {
-                    temp_alpha = alpha[M6_STATE][t - 1] - hmm_ptr->tr[TR_GE];
-                }
-
-                if (temp_alpha < alpha[E_STATE][t + 2]) {
-                    alpha[E_STATE][t + 2] = temp_alpha;
-                    path[E_STATE][t] = M6_STATE;
-                }
-
-                //transition from M6
-                if (t == 0){
-                    temp_alpha = prev_result->alpha[M3_STATE][prev_seq_len - 1] - hmm_ptr->tr[TR_GE];
-                } else {
-                    temp_alpha = alpha[M3_STATE][t - 1] - hmm_ptr->tr[TR_GE];
-                }
-
-                if (temp_alpha < alpha[E_STATE][t + 2]) {
-                    alpha[E_STATE][t + 2] = temp_alpha;
-                    path[E_STATE][t] = M3_STATE;
-                }
-
-                alpha[E_STATE][t] = max_dbl;
-                alpha[E_STATE][t+1] = max_dbl;
-                path[E_STATE][t+1] = E_STATE;
-                path[E_STATE][t+2] = E_STATE;
-
-                alpha[M6_STATE][t+2] = max_dbl;
-                alpha[M5_STATE][t+1] = max_dbl;
-                alpha[M4_STATE][t] = max_dbl;
-                alpha[M3_STATE][t+2] = max_dbl;
-                alpha[M2_STATE][t+1] = max_dbl;
-                alpha[M1_STATE][t] = max_dbl;
-
-                if (O[t + 1] == 'A' && O[t + 2] == 'A') {
-                    alpha[E_STATE][t + 2] -= log(0.54);
-                } else if (O[t + 1] == 'A' && O[t + 2] == 'G') {
-                    alpha[E_STATE][t + 2] -= log(0.16);
-                } else if (O[t + 1] == 'G' && O[t + 2] == 'A') {
-                    alpha[E_STATE][t + 2] -= log(0.30);
-                }
-
-                //adjustment based on probanility distribution
-                double start_freq = 0, h_kd, p_kd, r_kd;
-                int lbound, i;
-                if (t >= 60 || !prev_result){
-                    lbound = min(60, t);
-                    for (i = -lbound; i <= -3; ++i) {
-                        start_freq -= hmm_ptr->tr_E[i + 60][trinucleotide(O[t + i], O[t + i + 1], O[t + i + 2])];
-                    }
-                } else { //t < 60 && prev_result
-                    lbound = min(60, t + prev_seq_len);
-                    char nt1, nt2, nt3;
-                    for (i = -lbound; i <= -3; ++i) {
-                        nt1 = (t + i >= 0) ? O[t + i] : prev_result->O[prev_seq_len + t + i];
-                        nt2 = (t + i + 1 >= 0) ? O[t + i + 1] : prev_result->O[prev_seq_len + t + i + 1];
-                        nt3 = (t + i + 2 >= 0) ? O[t + i + 2] : prev_result->O[prev_seq_len + t + i + 2];
-                        start_freq -= hmm_ptr->tr_E[i + 60][trinucleotide(nt1, nt2, nt3)];
-                    }
-                }
-                start_freq *= 58.0 / (lbound - 2);
-
-                h_kd = hmm_ptr->E_dist[2] * exp(-1*pow(start_freq-hmm_ptr->E_dist[1],2)/(2*pow(hmm_ptr->E_dist[0],2)));
-                r_kd = hmm_ptr->E_dist[5] * exp(-1*pow(start_freq-hmm_ptr->E_dist[4],2)/(2*pow(hmm_ptr->E_dist[3],2)));
-                p_kd = h_kd / (h_kd + r_kd);
-                if (p_kd<0.01){
-                  p_kd=0.01;
-                }else if (p_kd>0.99){
-                  p_kd=0.99;
-                }
-                alpha[E_STATE][t + 2] -= log(p_kd);
-                return alpha[E_STATE][t];
-            }
-            return alpha[E_STATE][t]; //no stop codone
-        }
-        return alpha[E_STATE][t];//alpha[E_STATE][t] != 0
-    }
-    //also case when stop codon is on the edge connection
-    return max_dbl + 1;
-}
 
 
 Edge *create_raw_edge(Graph* g){
@@ -1544,11 +1445,11 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
             j = M6_STATE;
             if (t == 0) {
                 prev_alpha = prev_res[prev_ind].alpha;
-                prev_seq_len = prev_res[prev_ind].len_seq;
+                prev_seq_len = prev_res[prev_ind].len_seq - overlap;
                 prev_O = prev_res[prev_ind].O;
             } else {
                 prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                 prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
             }
             from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
@@ -1565,11 +1466,11 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 
                     if (t == 0) {
                         prev_alpha = prev_res[prev_ind].alpha;
-                        prev_seq_len = prev_res[prev_ind].len_seq;
+                        prev_seq_len = prev_res[prev_ind].len_seq - overlap;
                         prev_O = prev_res[prev_ind].O;
                     } else {
                         prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                        prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                        prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                         prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
                     }
                     from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
@@ -1590,11 +1491,11 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
             int x = curr_res->curr_column_prev[j + 1];
             if (t == 0) {
                 prev_alpha = prev_res[prev_ind].alpha;
-                prev_seq_len = prev_res[prev_ind].len_seq;
+                prev_seq_len = prev_res[prev_ind].len_seq - overlap;
                 prev_O = prev_res[prev_ind].O;
             } else {
                 prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                 prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
             }
             from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
@@ -1612,11 +1513,11 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 
             if (t == 0) {
                 prev_alpha = prev_res[prev_ind].alpha;
-                prev_seq_len = prev_res[prev_ind].len_seq;
+                prev_seq_len = prev_res[prev_ind].len_seq - overlap;
                 prev_O = prev_res[prev_ind].O;
             } else {
                 prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                 prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
             }
             from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
@@ -1625,12 +1526,7 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
             ans_res.alpha = alpha1 - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i - M1_STATE][from2][to];
             ans_res.path = j;
             ans_res.prev_ind = (t == 0) ? prev_ind : curr_res->curr_column_prev[j + 1];
-#ifdef M_state_debug
-            if (t == 411 && i == M4_STATE){
-                int xx =12;
-                xx += 20;
-            }
-#endif
+
             //from D
             if (whole_genome == 0) {
                 for (j = M6_STATE; j >= M1_STATE; --j) {
@@ -1644,11 +1540,11 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
                     if (num_d > 0) {
                         if (t == 0) {
                             prev_alpha = prev_res[prev_ind].alpha;
-                            prev_seq_len = prev_res[prev_ind].len_seq;
+                            prev_seq_len = prev_res[prev_ind].len_seq - overlap;
                             prev_O = prev_res[prev_ind].O;
                         } else {
                             prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                             prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
                         }
                         from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
@@ -1671,18 +1567,14 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 
         if (t == 0) {
             prev_alpha = prev_res[prev_ind].alpha;
-            prev_seq_len = prev_res[prev_ind].len_seq;
+            prev_seq_len = prev_res[prev_ind].len_seq - overlap;
             prev_O = prev_res[prev_ind].O;
         } else {
             prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
             prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
         }
         from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
-
-        ///
-        ///Обязательно проверить этот блок!!!!
-        ///
         prev_temp_i = (t == 0 && curr_res->curr_column_prev[j + 1] >= 0) ? prev_res[curr_res->curr_column_prev[j + 1]].temp_i : NULL;
 
         if (t < 2 && n_prev == 0){
@@ -1725,12 +1617,6 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
         ans_res.prev_ind = curr_res->curr_column_prev[i + 1];//???;
         ans_res.alpha2 = (t + 2 < curr_res->len_seq) ? curr_res->alpha[i][t + 2] : 0;
     }
-#ifdef M_state_debug
-    if (i == M4_STATE && (t >= 410)){
-        int yy = 5;
-        --yy;
-    }
-#endif
     return ans_res;
 }
 
@@ -1739,10 +1625,10 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
     double max_dbl = 10000000000.0, temp_alpha;
     TmpResult ans_res;
     int j, num_d;
-    double **alpha = curr_res->alpha, alpha1, **prev_alpha; //**prev_alpha = prev_res ? prev_res[prev_index].alpha : NULL, alpha1;
-    char* O = curr_res->O, *prev_O; //= prev_res ? prev_res[prev_index].O : NULL;
-    int *temp_i_1 = curr_res->temp_i_1, *prev_temp_i_1;// = prev_res ? prev_res[prev_index].temp_i_1 : NULL;
-    int prev_seq_len;// = prev_res ? prev_res[prev_index].len_seq : -1;
+    double **alpha = curr_res->alpha, alpha1, **prev_alpha;
+    char* O = curr_res->O, *prev_O;
+    int *temp_i_1 = curr_res->temp_i_1, *prev_temp_i_1;
+    int prev_seq_len;
 
     if (t == 0 && n_prev == 0) {
         ans_res.alpha = -hmm_ptr->pi[i];
@@ -1757,11 +1643,11 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
         j = S_STATE_1;
         if (t == 0) {
             prev_alpha = prev_res[prev_index].alpha;
-            prev_seq_len = prev_res[prev_index].len_seq;
+            prev_seq_len = prev_res[prev_index].len_seq - overlap;
             prev_O = prev_res[prev_index].O;
         } else {
             prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
             prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
         }
         from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
@@ -1784,11 +1670,11 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
                 j = M6_STATE_1;
                 if (t == 0) {
                     prev_alpha = prev_res[prev_index].alpha;
-                    prev_seq_len = prev_res[prev_index].len_seq;
+                    prev_seq_len = prev_res[prev_index].len_seq - overlap;
                     prev_O = prev_res[prev_index].O;
                 } else {
                     prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                    prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                    prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                     prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
                 }
 
@@ -1802,11 +1688,11 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
                         num_d = i - j + 6;
                         if (t == 0) {
                             prev_alpha = prev_res[prev_index].alpha;
-                            prev_seq_len = prev_res[prev_index].len_seq;
+                            prev_seq_len = prev_res[prev_index].len_seq - overlap;
                             prev_O = prev_res[prev_index].O;
                         } else {
                             prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                             prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
                         }
                         from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
@@ -1826,11 +1712,11 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
                 j = i - 1;
                 if (t == 0) {
                     prev_alpha = prev_res[prev_index].alpha;
-                    prev_seq_len = prev_res[prev_index].len_seq;
+                    prev_seq_len = prev_res[prev_index].len_seq - overlap;
                     prev_O = prev_res[prev_index].O;
                 } else {
                     prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                    prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                    prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap: -1;
                     prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
                 }
                 from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
@@ -1845,11 +1731,11 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
                     for (j = M6_STATE_1; j >= M1_STATE_1; --j) {
                         if (t == 0) {
                             prev_alpha = prev_res[prev_index].alpha;
-                            prev_seq_len = prev_res[prev_index].len_seq;
+                            prev_seq_len = prev_res[prev_index].len_seq - overlap;
                             prev_O = prev_res[prev_index].O;
                         } else {
                             prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                            prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                             prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
                         }
                         from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
@@ -1880,12 +1766,12 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
             j = (i == M1_STATE_1) ? I6_STATE_1 : (I1_STATE_1 + (i - M1_STATE_1 - 1));
             if (t == 0) {
                 prev_alpha = prev_res[prev_index].alpha;
-                prev_seq_len = prev_res[prev_index].len_seq;
+                prev_seq_len = prev_res[prev_index].len_seq - overlap;
                 prev_O = prev_res[prev_index].O;
             } else {
                 int x = curr_res->curr_column_prev[j + 1];
                 prev_alpha = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].alpha : NULL;
-                prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq : -1;
+                prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                 prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
             }
             prev_temp_i_1 = (t == 0 && curr_res->curr_column_prev[j + 1] >= 0) ? prev_res[curr_res->curr_column_prev[j + 1]].temp_i_1 : NULL;
@@ -1938,11 +1824,11 @@ TmpResult insertion_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *c
         ans_res.prev_ind = -1;
     } else if (t == 0 && n_prev > 0) {
         ans_res.prev_ind = prev_index;
-        int prev_seq_len = prev_res[prev_index].len_seq;
+        int prev_seq_len = prev_res[prev_index].len_seq - overlap;
         //from I
         j = i;
-        from = nt2int(prev_res[prev_index].O[prev_res[prev_index].len_seq - 1]);
-        ans_res.alpha = prev_res[prev_index].alpha[j][prev_res[prev_index].len_seq - 1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
+        from = nt2int(prev_res[prev_index].O[prev_seq_len - 1]);
+        ans_res.alpha = prev_res[prev_index].alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
         ans_res.path = j;
         ans_res.prev_ind = (t == 0) ? prev_index : curr_res->curr_column_prev[j + 1];
 
@@ -1987,11 +1873,11 @@ TmpResult insertion_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *c
 
 TmpResult insertion_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, ViterbiResult *prev_res, int prev_index, int n_prev, size_t overlap, int to){
     double max_dbl = 10000000000.0, alpha1, temp_alpha;
-    double **alpha = curr_res->alpha, **prev_alpha ;//= prev_res ? prev_res[prev_index].alpha : NULL;
+    double **alpha = curr_res->alpha, **prev_alpha ;
     TmpResult ans_res;
-    char *prev_O;// = prev_res ? prev_res[prev_index].O : NULL;
-    int j, from, prev_seq_len;// = prev_res ? prev_res[prev_index].len_seq : -1;
-    int **path = curr_res->path, **prev_path;// = prev_res ? prev_res[prev_index].path : NULL;
+    char *prev_O;
+    int j, from, prev_seq_len;
+    int **path = curr_res->path, **prev_path;
     ans_res.alpha2 = 0;
     if (n_prev == 0 && t == 0){
         ans_res.alpha = -hmm_ptr->pi[i];
@@ -2003,7 +1889,7 @@ TmpResult insertion_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
         j = i;
         if (t == 0) {
             prev_O = prev_res[prev_index].O;
-            prev_seq_len = prev_res[prev_index].len_seq;
+            prev_seq_len = prev_res[prev_index].len_seq - overlap;
             from = nt2int(prev_O[prev_seq_len - 1]);
             alpha1 = prev_res[prev_index].alpha[j][prev_seq_len - 1];
         } else {
@@ -2061,7 +1947,7 @@ TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
     } else if (t == 0 && n_prev > 0) {
         j = R_STATE;
         prev_alpha = prev_res[prev_index].alpha;
-        prev_seq_len = prev_res[prev_index].len_seq;
+        prev_seq_len = prev_res[prev_index].len_seq - overlap;
         prev_O = prev_res[prev_index].O;
 
         from = nt2int(prev_O[prev_seq_len - 1]);
@@ -2137,9 +2023,9 @@ TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_re
         ans_res.prev_ind = -1;
         ans_res.alpha2 = 0;
     } else {
-        double **prev_alpha;// = (prev_res) ? prev_res[prev_index].alpha : NULL;
-        int prev_seq_len;// = (prev_res) ? prev_res[prev_index].len_seq : 0;
-        char *prev_O;// = (prev_res) ? prev_res[prev_index].O : NULL;
+        double **prev_alpha;
+        int prev_seq_len;
+        char *prev_O;
         if (alpha[E_STATE][t] == 0){
             ans_res.alpha = max_dbl;
             //ans_res.alpha2 = max_dbl + 2;
@@ -2157,7 +2043,7 @@ TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_re
                 if(t == 0) {
                     //since t == 0 we now the edge which we consider to be previos
                     prev_alpha = prev_res[prev_index].alpha;
-                    prev_seq_len = prev_res[prev_index].len_seq;
+                    prev_seq_len = prev_res[prev_index].len_seq - overlap;
                     temp_alpha = prev_alpha[M6_STATE][prev_seq_len - 1] - hmm_ptr->tr[TR_GE];
                 } else {
                     temp_alpha = alpha[M6_STATE][t - 1] - hmm_ptr->tr[TR_GE];
@@ -2170,7 +2056,7 @@ TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_re
                 //transition from M3
                 if (t == 0){
                     prev_alpha = prev_res[prev_index].alpha;
-                    prev_seq_len = prev_res[prev_index].len_seq;
+                    prev_seq_len = prev_res[prev_index].len_seq - overlap;
                     temp_alpha = prev_alpha[M3_STATE][prev_seq_len - 1] - hmm_ptr->tr[TR_GE];
                 } else {
                     temp_alpha = alpha[M3_STATE][t - 1] - hmm_ptr->tr[TR_GE];
@@ -2201,7 +2087,7 @@ TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_re
                     }
                 } else { // t < 60 && prev_res
                     prev_O = (t == 0) ? prev_res[prev_index].O : prev_res[curr_res->curr_column_prev[ans_res.path + 1]].O;
-                    prev_seq_len = (t == 0) ? prev_res[prev_index].len_seq : prev_res[curr_res->curr_column_prev[ans_res.path + 1]].len_seq;
+                    prev_seq_len = (t == 0) ? prev_res[prev_index].len_seq - overlap : prev_res[curr_res->curr_column_prev[ans_res.path + 1]].len_seq - overlap;
                     lbound = min(60, t + prev_seq_len);
                     char nt1, nt2, nt3;
                     for (i = -lbound; i <= -3; ++i){
@@ -2257,14 +2143,14 @@ TmpResult start_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
 
                 //from R
 
-                alpha1 = (t > 0) ? alpha[R_STATE][t - 1] : prev_res[prev_index].alpha[R_STATE][prev_res[prev_index].len_seq - 1];
+                alpha1 = (t > 0) ? alpha[R_STATE][t - 1] : prev_res[prev_index].alpha[R_STATE][prev_res[prev_index].len_seq - overlap - 1];
                 ans_res.alpha2 = alpha1 - hmm_ptr->tr[TR_RS];
                 ans_res.path = R_STATE;
                 ans_res.prev_ind = curr_res->curr_column_prev[R_STATE + 1];
                 //не забыть в main переназначить alpha и path для кодона
 
                 //from E'
-                alpha1 = (t > 0) ? alpha[E_STATE_1][t - 1] : prev_res[prev_index].alpha[E_STATE_1][prev_res[prev_index].len_seq - 1];
+                alpha1 = (t > 0) ? alpha[E_STATE_1][t - 1] : prev_res[prev_index].alpha[E_STATE_1][prev_res[prev_index].len_seq - overlap - 1];
                 temp_alpha = alpha1 - hmm_ptr->tr[TR_ES];
                 if (temp_alpha < ans_res.alpha2) {
                     ans_res.alpha2 = temp_alpha;
@@ -2273,7 +2159,7 @@ TmpResult start_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
                 }
 
                 //from E
-                alpha1 = (t > 0) ? alpha[E_STATE][t - 1] : prev_res[prev_index].alpha[E_STATE][prev_res[prev_index].len_seq - 1];
+                alpha1 = (t > 0) ? alpha[E_STATE][t - 1] : prev_res[prev_index].alpha[E_STATE][prev_res[prev_index].len_seq - overlap - 1];
                 temp_alpha = alpha1 - hmm_ptr->tr[TR_ES1];
                 if (temp_alpha < ans_res.alpha2){
                     ans_res.alpha2 = temp_alpha;
@@ -2340,7 +2226,7 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
             if (t < len_seq - 2 && O[t] == 'C' && O[t + 1] == 'A' &&
                     ( O[t + 2] == 'T' || O[t + 2] == 'A' || O[t + 2] == 'C')) {
                 //transition from frame 6
-                alpha1 = (t > 0) ? alpha[M6_STATE_1][t - 1] : prev_res[prev_index].alpha[M6_STATE_1][prev_res[prev_index].len_seq - 1]; //here only if t >0 || t == 0 && prev_res => no null
+                alpha1 = (t > 0) ? alpha[M6_STATE_1][t - 1] : prev_res[prev_index].alpha[M6_STATE_1][prev_res[prev_index].len_seq - overlap - 1]; //here only if t >0 || t == 0 && prev_res => no null
                 ans_res.alpha2 = alpha1 - hmm_ptr->tr[TR_GE];
                 ans_res.path = M6_STATE_1;
                 ans_res.prev_ind = curr_res->curr_column_prev[M6_STATE_1 + 1];
@@ -2368,7 +2254,7 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
                     }
                 } else {
                     prev_O = (t == 0) ? prev_res[prev_index].O : prev_res[curr_res->curr_column_prev[ans_res.path + 1]].O;
-                    prev_seq_len = (t == 0) ? prev_res[prev_index].len_seq : prev_res[ans_res.prev_ind].len_seq;
+                    prev_seq_len = (t == 0) ? prev_res[prev_index].len_seq - overlap : prev_res[ans_res.prev_ind].len_seq - overlap;
                     lbound = min(t, 30);
                     char nt1, nt2, nt3;
                     for (i = -lbound; i <= 30; ++i){
@@ -2429,7 +2315,7 @@ TmpResult start_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
                 //не забыть в 'main' переназначить alpha[S_STATE][t + 1] и path[S_STATE][t+1]
                 //from R
                 if (t == 0) {
-                    ans_res.alpha2 = prev_res[prev_index].alpha[R_STATE][prev_res[prev_index].len_seq - 1] - hmm_ptr->tr[TR_RS];
+                    ans_res.alpha2 = prev_res[prev_index].alpha[R_STATE][prev_res[prev_index].len_seq - overlap - 1] - hmm_ptr->tr[TR_RS];
                 } else {
                     ans_res.alpha2 = alpha[R_STATE][t - 1] - hmm_ptr->tr[TR_RS];
                 }
@@ -2438,7 +2324,7 @@ TmpResult start_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 
                 //from E state
                 if (t == 0) {
-                    temp_alpha = prev_res[prev_index].alpha[E_STATE][prev_res[prev_index].len_seq - 1] - hmm_ptr->tr[TR_ES];
+                    temp_alpha = prev_res[prev_index].alpha[E_STATE][prev_res[prev_index].len_seq - overlap - 1] - hmm_ptr->tr[TR_ES];
                 } else {
                     temp_alpha = alpha[E_STATE][t - 1] - hmm_ptr->tr[TR_ES];
                 }
@@ -2450,7 +2336,7 @@ TmpResult start_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 
                 //from E1
                 if (t == 0) {
-                    temp_alpha = prev_res[prev_index].alpha[E_STATE_1][prev_res[prev_index].len_seq - 1] - hmm_ptr->tr[TR_ES1];
+                    temp_alpha = prev_res[prev_index].alpha[E_STATE_1][prev_res[prev_index].len_seq -overlap  - 1] - hmm_ptr->tr[TR_ES1];
                 } else {
                     temp_alpha = alpha[E_STATE_1][t - 1] - hmm_ptr->tr[TR_ES1];
                 }
@@ -2482,7 +2368,7 @@ TmpResult start_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
                     start_freq *= 61.0 / (30 + lbound + 1);
                 } else if (prev_res){
                     prev_O = (t == 0) ? prev_res[prev_index].O : prev_res[ans_res.prev_ind].O;
-                    prev_seq_len = (t == 0) ? prev_res[prev_index].len_seq : prev_res[ans_res.prev_ind].len_seq;
+                    prev_seq_len = (t == 0) ? prev_res[prev_index].len_seq - overlap : prev_res[ans_res.prev_ind].len_seq - overlap;
                     lbound = min(30, t + prev_seq_len);
                     for (i = -lbound; i <= 30 ; ++i){
                         if (t + i + 2 < curr_res->len_seq) {
