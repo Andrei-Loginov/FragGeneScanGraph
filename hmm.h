@@ -136,6 +136,7 @@ typedef struct {
     int* dead_end_flg;
     char** obs_seq;
     char** head;
+    int *ind;
     ViterbiResult *edge_results;
 } Graph;
 
@@ -201,6 +202,10 @@ void get_rc_dna(char *dna, char *dna1);
 void get_corrected_dna(char *dna, char *dna_f);
 
 
+char complementary_nucleotide(char c);
+size_t get_edge_num_m(Graph *g, int ind, char strand);
+size_t get_edge_num(int* ind, size_t n_edge, int num, char strand);
+Graph read_gfa(FILE *f);
 
 Graph read_graph(FILE* fp, FILE* fp_matr);
 int *topological_sort(int **adj_matrix, int n_vert);

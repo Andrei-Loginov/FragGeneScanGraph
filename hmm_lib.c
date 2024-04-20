@@ -2459,3 +2459,122 @@ int *topological_sort(int **adj_matrix, int n_vert){
     return ans;
 }
 
+char complementary_nucleotide(char c){
+    if (c == 'A') return 'T';
+    if (c == 'T') return 'A';
+    if (c == 'G') return 'C';
+    if (c == 'C') return 'G';
+    return -1;
+}
+
+size_t get_edge_num_m(Graph *g, int ind, char strand){
+   ind = (strand == '+') ? ind : -ind;
+   size_t i;
+   size_t ans = 0;
+   for (i = 0; i < g->n_edge && !(ans); ++i){
+       if (g->ind[i] == ind)
+           return i;
+   }
+   return -1;
+}
+
+size_t get_edge_num(int* ind, size_t n_edge, int num, char strand){
+    size_t i;
+    for (i = 0; i < n_edge; ++i){
+        if (ind[i] == num){
+            if (strand == '-')
+                return 2 * i + 1;
+            return 2 * i;
+        }
+    }
+    return -1;
+}
+
+
+Graph read_gfa(FILE *f){
+    Graph ans;
+    ans.n_edge = 0;
+    //FILE *f = fopen(fname, "r");
+    char line[500000], c;
+    size_t i, j, seq_len, n_segm = 0;
+    int num;
+    /*
+     * First pass. Count number of segments;
+     */
+    fgets(line, 500000, f);
+    while (line[0] == 'S'){
+        //sscanf(line, "%c\t%d\t%s", &c, &num, )
+        ++n_segm;
+        fgets(line, 500000, f);
+    }
+    int *is_linked = ivector(n_segm * 2);
+    int *ind = ivector(n_segm);
+    rewind(f);
+    /*
+     * Second pass. Write sefment numbers, write which segment in which strand is used in graph.
+     */
+    for (i = 0; i < n_segm; ++i){
+        fgets(line, 500000, f);
+        sscanf(line, "%c\t%d\t", &c, &num);
+        ind[i] = num;
+    }
+
+    char seq[500000], strand_from, strand_to;
+    int num_from ,num_to;
+    while(fgets(line, 500000, f)){
+        sscanf(line, "%c\t%d\t%c\t%d\t%c", &c, &num_from, &strand_from, &num_to, &strand_to);
+        size_t index = get_edge_num(ind, n_segm, num_from, strand_from);
+        if (!is_linked[index]){
+            is_linked[index] = 1;
+            ++ans.n_edge;
+        }
+        index = get_edge_num(ind, n_segm, num_to, strand_to);
+        if (!is_linked[index]){
+            is_linked[index] = 1;
+            ++ans.n_edge;
+        }
+    }
+    ans.ind = ivector(ans.n_edge);
+    ans.adjacency_matrix = imatrix(ans.n_edge, ans.n_edge);
+    ans.seq_len = ivector(ans.n_edge);
+    ans.dead_end_flg = ivector(ans.n_edge);
+    ans.obs_seq = (char**)malloc(ans.n_edge * sizeof(char*));
+    rewind(f);
+    /*
+     * The third pass. Save segments in needed strands, make adjacency matrix according to Links.
+     */
+    size_t counter = 0;
+    for (i = 0; i < n_segm; ++i){
+        fgets(line, 500000, f);
+        sscanf(line, "%c\t%d\t%s", &c, &num, seq);
+        if (is_linked[2 * i]) {
+            ans.seq_len[counter] = strlen(seq);
+            ans.obs_seq[counter] = (char*)malloc(ans.seq_len[counter] + 1);
+            strcpy(ans.obs_seq[counter], seq);
+            ans.ind[counter] = num;
+            ++counter;
+        }
+        if (is_linked[2 * i + 1]){
+            ans.seq_len[counter] = strlen(seq);
+            ans.obs_seq[counter] = (char*)malloc(ans.seq_len[counter] + 1);
+            ans.obs_seq[counter][ans.seq_len[counter]] = '\0';
+            for (j = 0; j < ans.seq_len[counter]; ++j){
+                ans.obs_seq[counter][j] = complementary_nucleotide(seq[ans.seq_len[counter] - j - 1]);
+            }
+            //printf("%d; %d", (int)ans.obs_seq[counter][0], (int)'\t');
+            ans.ind[counter] = -num;
+            ++counter;
+        }
+    }
+    //Making adjacency matrix;
+    while(fgets(line, 500000, f)){
+        sscanf(line, "%c\t%d\t%c\t%d\t%c\t%zuM", &c, &num_from, &strand_from, &num_to, &strand_to, &ans.overlap);
+        size_t ind_from = get_edge_num_m(&ans, num_from, strand_from);
+        size_t ind_to = get_edge_num_m(&ans, num_to, strand_to);
+        ans.adjacency_matrix[ind_from][ind_to] = 1;
+    }
+    //fclose(f);
+    free(is_linked);
+    free(ind);
+    return ans;
+}
