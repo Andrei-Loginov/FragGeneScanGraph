@@ -231,15 +231,17 @@ int main (int argc, char **argv)
     sprintf(tmp_str, "%s-matrix.txt", seq_file);
     fp_matr = fopen(tmp_str, "r");
     edge_num = 0;
-
+    /*
     if (!fp_matr) {
         printf("Can't open matrix file %s\n", tmp_str);
         exit(0);
     }
+
     g = read_graph(fp, fp_matr);
-    //ViterbiResult* results = (ViterbiResult*)malloc(g.n_edge * sizeof(ViterbiResult));
+    */
+    g = read_gfa(fp);
     cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
-    viterbi_graph(&hmm, &g, wholegenome);
+    viterbi_graph_dag(&hmm, &g, wholegenome);
     fprint_imatrix(g.adjacency_matrix, g.n_edge, g.n_edge, "some_out_file.txt");
     GraphPath ans = restore_path(g.edge_results, &g, 1, NUM_STATE);
     printf("%s\n", ans.O);

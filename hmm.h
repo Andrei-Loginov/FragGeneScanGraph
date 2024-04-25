@@ -172,7 +172,7 @@ void backtrack_graph_path(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp
                GraphPath *gp); //gene prediction using restored path
 
 ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_genome);
-void viterbi_graph(HMM *hmm_ptr, Graph* g, int whole_genome);
+void viterbi_graph_dag(HMM *hmm_ptr, Graph* g, int whole_genome);
 GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state); //restores path using ViterbiMatrix
 
 

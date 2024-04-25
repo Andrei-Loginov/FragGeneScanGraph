@@ -97,7 +97,7 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
     return ans;
 }
 
-void viterbi_graph(HMM *hmm_ptr, Graph* g, int whole_genome) {
+void viterbi_graph_dag(HMM *hmm_ptr, Graph* g, int whole_genome) {
     //assuming that adjacency matrix is upper triangular
     int *order = topological_sort(g->adjacency_matrix, g->n_edge);
     g->edge_results = (ViterbiResult*)malloc(g->n_edge * sizeof (ViterbiResult));
@@ -2539,6 +2539,7 @@ Graph read_gfa(FILE *f){
     ans.seq_len = ivector(ans.n_edge);
     ans.dead_end_flg = ivector(ans.n_edge);
     ans.obs_seq = (char**)malloc(ans.n_edge * sizeof(char*));
+    ans.head = (char**)malloc(ans.n_edge * sizeof(char*));
     rewind(f);
     /*
      * The third pass. Save segments in needed strands, make adjacency matrix according to Links.
@@ -2552,6 +2553,8 @@ Graph read_gfa(FILE *f){
             ans.obs_seq[counter] = (char*)malloc(ans.seq_len[counter] + 1);
             strcpy(ans.obs_seq[counter], seq);
             ans.ind[counter] = num;
+            ans.head[counter] = (char*)malloc(20);
+            sprintf(ans.head[counter], "%d+", num);
             ++counter;
         }
         if (is_linked[2 * i + 1]){
@@ -2563,6 +2566,8 @@ Graph read_gfa(FILE *f){
             }
             //printf("%d; %d", (int)ans.obs_seq[counter][0], (int)'\t');
             ans.ind[counter] = -num;
+            ans.head[counter] = (char*)malloc(20);
+            sprintf(ans.head[counter], "%d-", num);
             ++counter;
         }
     }
