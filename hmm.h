@@ -137,6 +137,7 @@ typedef struct {
     char** obs_seq;
     char** head;
     int *ind;
+    int *order;
     ViterbiResult *edge_results;
 } Graph;
 

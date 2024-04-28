@@ -18,6 +18,7 @@
 //#define I1_debug
 //#define R_state_debug
 //#define E1_state_debug
+#define M_rc_debug
 
 void dump_memory(void *p, int size);
 
@@ -58,7 +59,7 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
             g->dead_end_flg[edge_index] = 0;
         }
     }
-    printf("endge = %d\tdead_end_flg = %d\n", edge_index, g->dead_end_flg[edge_index]);
+    //printf("edge = %d\tdead_end_flg = %d\n", edge_index, g->dead_end_flg[edge_index]);
     ans.path[I6_STATE_1][413] = 0;
     int rbound = ans.len_seq;
     if (!g->dead_end_flg[edge_index]){
@@ -99,13 +100,12 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
 
 void viterbi_graph_dag(HMM *hmm_ptr, Graph* g, int whole_genome) {
     //assuming that adjacency matrix is upper triangular
-    int *order = topological_sort(g->adjacency_matrix, g->n_edge);
+    g->order = topological_sort(g->adjacency_matrix, g->n_edge);
     g->edge_results = (ViterbiResult*)malloc(g->n_edge * sizeof (ViterbiResult));
     size_t i;
     for (i = 0; i < g->n_edge; ++i){
-        g->edge_results[order[i]] = viterbi_edge(hmm_ptr, g, order[i], whole_genome);
+        g->edge_results[g->order[i]] = viterbi_edge(hmm_ptr, g, g->order[i], whole_genome);
     }
-    free(order);
 }
 
 GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
@@ -125,7 +125,7 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
         alpha[edge_counter] = (double*)malloc(res[curr_edge].len_seq * sizeof(double));
         edge_path[edge_counter] = curr_edge;
         curr_len_seq = (g->dead_end_flg[curr_edge]) ? res[curr_edge].len_seq : res[curr_edge].len_seq - g->overlap;
-
+        printf("edge_counter = %d, head = %s\n", edge_counter, g->head[curr_edge]);
         if (edge_counter == 0){ //the last edge
             vpath[edge_counter][curr_len_seq - 1] = 0;
             for (i = 0; i < num_state; ++i){
@@ -143,7 +143,7 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
         }
         vertex_path = res[curr_edge].path[vpath[edge_counter][0]][0];
         curr_edge = res[curr_edge].curr_column_prev[vpath[edge_counter][curr_len_seq - 1] + 1];
-        printf("New curr_edge = %d\n", curr_edge);
+        //printf("New curr_edge = %d\n", curr_edge);
         ++edge_counter;
     }
     ans.vpath = (int*)malloc(ans.seq_len * sizeof(int));
@@ -493,9 +493,6 @@ void backtrack_graph_path(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp
 
         }
     }
-#ifdef viterbi_out_flg
-    printf("End of viterbi\n");
-#endif
     free_ivector(vpath);
     return;
 }
@@ -890,7 +887,7 @@ int get_prob_form_cg_graph(HMM *hmm_ptr, TRAIN *train_ptr, Graph *g){
     int i, j;
     for (i = 0; i < g->n_edge; ++i){
         total_len += g->seq_len[i];
-        printf("i = %d, seq_len = %d\n%s\n", i, g->seq_len[i], g->obs_seq[i]);
+        //printf("i = %d, seq_len = %d\n%s\n", i, g->seq_len[i], g->obs_seq[i]);
         for (j = 0; j < g->seq_len[i]; ++j){
             if (g->obs_seq[i][j] == 'C' || g->obs_seq[i][j] =='c' || g->obs_seq[i][j] == 'G' || g->obs_seq[i][j] == 'g'){
                 ++cg_count;
@@ -1403,10 +1400,10 @@ double any_state_prob(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, Viter
 
     }
 
-    curr_res->curr_column_prev[i] = ans_res.prev_ind;
+    curr_res->curr_column_prev[i + 1] = ans_res.prev_ind;
     curr_res->path[i][t] = ans_res.path;
     if (t == 0) {
-        curr_res->first_column_prev[i] = ans_res.prev_ind;
+        curr_res->first_column_prev[i + 1] = ans_res.prev_ind;
     }
     //curr_res->alpha[i][t] = ans_res.alpha;
     return ans_res.alpha;
@@ -1774,7 +1771,7 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
                 prev_seq_len = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].len_seq - overlap : -1;
                 prev_O = (curr_res->curr_column_prev[j + 1] >=0) ? prev_res[curr_res->curr_column_prev[j + 1]].O : NULL;
             }
-            prev_temp_i_1 = (t == 0 && curr_res->curr_column_prev[j + 1] >= 0) ? prev_res[curr_res->curr_column_prev[j + 1]].temp_i_1 : NULL;
+            prev_temp_i_1 = (/*t == 0 &&*/ curr_res->curr_column_prev[j + 1] >= 0) ? prev_res[curr_res->curr_column_prev[j + 1]].temp_i_1 : NULL;
             from2 = count_from2(t, O, curr_res->len_seq, prev_O, prev_seq_len);
             if (t < 2 && n_prev == 0) {
 
@@ -1788,6 +1785,8 @@ TmpResult match_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr
                          ( prev1 == 'T' && O[t] == 'C'))) {
 
                 } else {
+
+                    //now prev_temp_i_1 is null;
                     prev2 =(curr_res->curr_column_prev[j + 1] < 0) ? O[temp_i_1[j - I1_STATE_1] - 1] :
                             ((t == 0) ? prev_O[prev_temp_i_1[j - I1_STATE_1] - 1] :
                                 (temp_i_1[j - I1_STATE_1] > 0 ? O[temp_i_1[j - I1_STATE_1] - 1] :
@@ -2048,6 +2047,11 @@ TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_re
                 } else {
                     temp_alpha = alpha[M6_STATE][t - 1] - hmm_ptr->tr[TR_GE];
                 }
+                if(t == 2){
+                    int x = 5;
+                    double palpha = alpha[M6_STATE][t - 1], tr_ge = hmm_ptr->tr[TR_GE];
+                    ++x;
+                }
                 if (temp_alpha < ans_res.alpha2) {
                     ans_res.alpha2 = temp_alpha;
                     ans_res.path = M6_STATE;
@@ -2060,6 +2064,10 @@ TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_re
                     temp_alpha = prev_alpha[M3_STATE][prev_seq_len - 1] - hmm_ptr->tr[TR_GE];
                 } else {
                     temp_alpha = alpha[M3_STATE][t - 1] - hmm_ptr->tr[TR_GE];
+                }
+                if(t == 2){
+                    int y = 5;
+                    ++y;
                 }
                 if (temp_alpha < ans_res.alpha2) {
                     ans_res.alpha2 = temp_alpha;
@@ -2507,12 +2515,77 @@ Graph read_gfa(FILE *f){
         ++n_segm;
         fgets(line, 500000, f);
     }
+    ans.n_edge = n_segm * 2;
+
+    ans.ind = ivector(ans.n_edge);
+    ans.adjacency_matrix = imatrix(ans.n_edge, ans.n_edge);
+    ans.seq_len = ivector(ans.n_edge);
+    ans.dead_end_flg = ivector(ans.n_edge);
+    ans.obs_seq = (char**)malloc(ans.n_edge * sizeof(char*));
+    ans.head = (char**)malloc(ans.n_edge * sizeof(char*));
+    rewind(f);
+
+    //Read and save sequences
+    char seq[500000], strand_from, strand_to;
+    int num_from ,num_to;
+    for (i = 0; i < n_segm; ++i){
+        fgets(line, 500000, f);
+        sscanf(line, "%c\t%d\t%s", &c, &num, seq);
+        //+strand
+        ans.ind[2 * i] = num;
+        ans.seq_len[2 * i] = strlen(seq);
+        ans.obs_seq[2 * i] = (char*)malloc(ans.seq_len[2 * i] + 1);
+        strcpy(ans.obs_seq[2 * i], seq);
+        ans.head[2 * i] = (char*)malloc(20);
+        sprintf(ans.head[2 * i], "%d+", ans.ind[2 * i]);
+        //-strand
+        ans.ind[2 * i + 1] = -num;
+        ans.seq_len[2 * i + 1] = ans.seq_len[2 * i];
+        ans.obs_seq[2 * i  + 1] = (char*)malloc(ans.seq_len[2 * i + 1] + 1);
+        ans.obs_seq[2 * i + 1][ans.seq_len[2 * i  +1]] = '\0';
+        for (j = 0; j < ans.seq_len[2 * i + 1]; ++j){
+            ans.obs_seq[2 * i + 1][j] = complementary_nucleotide(seq[ans.seq_len[2 * i + 1] - j - 1]);
+        }
+        ans.head[2 * i + 1] = (char*)malloc(20);
+        sprintf(ans.head[2 * i + 1], "%d-", ans.ind[2 * i + 1]);
+    }
+    //read links and construct adjacency matrix
+    while (fgets(line, 500000, f)){
+        sscanf(line, "%c\t%d\t%c\t%d\t%c\t%zuM", &c, &num_from, &strand_from, &num_to, &strand_to, &ans.overlap);
+        //straight
+        size_t ind_from = get_edge_num_m(&ans, num_from, strand_from);
+        size_t ind_to = get_edge_num_m(&ans, num_to, strand_to);
+        //printf("%d%c; %d%c; %zu; %zu\n", num_from, strand_from, num_to, strand_to, ind_from, ind_to);
+        ans.adjacency_matrix[ind_from][ind_to] = 1;
+        //reverse-complementary
+        ind_from += (strand_from == '+') ? 1 : -1;
+        ind_to += (strand_to == '+') ? 1 : -1;
+        //printf("%d%c; %d%c; %zu; %zu\n", num_to, (strand_to == '+') ? '-' : '+', num_from, (strand_from == '+') ? '-' : '+', ind_to, ind_from);
+        ans.adjacency_matrix[ind_to][ind_from] = 1;
+    }
+    return ans;
+    /*
+    Graph ans;
+    ans.n_edge = 0;
+    //FILE *f = fopen(fname, "r");
+    char line[500000], c;
+    size_t i, j, seq_len, n_segm = 0;
+    int num;
+    ///
+    /// First pass. Count number of segments;
+    ///
+    fgets(line, 500000, f);
+    while (line[0] == 'S'){
+        //sscanf(line, "%c\t%d\t%s", &c, &num, )
+        ++n_segm;
+        fgets(line, 500000, f);
+    }
     int *is_linked = ivector(n_segm * 2);
     int *ind = ivector(n_segm);
     rewind(f);
-    /*
-     * Second pass. Write sefment numbers, write which segment in which strand is used in graph.
-     */
+    ///
+    /// Second pass. Write sefment numbers, write which segment in which strand is used in graph.
+    ///
     for (i = 0; i < n_segm; ++i){
         fgets(line, 500000, f);
         sscanf(line, "%c\t%d\t", &c, &num);
@@ -2527,59 +2600,60 @@ Graph read_gfa(FILE *f){
         if (!is_linked[index]){
             is_linked[index] = 1;
             ++ans.n_edge;
-        }
-        index = get_edge_num(ind, n_segm, num_to, strand_to);
-        if (!is_linked[index]){
-            is_linked[index] = 1;
-            ++ans.n_edge;
-        }
-    }
-    ans.ind = ivector(ans.n_edge);
-    ans.adjacency_matrix = imatrix(ans.n_edge, ans.n_edge);
-    ans.seq_len = ivector(ans.n_edge);
-    ans.dead_end_flg = ivector(ans.n_edge);
-    ans.obs_seq = (char**)malloc(ans.n_edge * sizeof(char*));
-    ans.head = (char**)malloc(ans.n_edge * sizeof(char*));
-    rewind(f);
-    /*
-     * The third pass. Save segments in needed strands, make adjacency matrix according to Links.
-     */
-    size_t counter = 0;
-    for (i = 0; i < n_segm; ++i){
-        fgets(line, 500000, f);
-        sscanf(line, "%c\t%d\t%s", &c, &num, seq);
-        if (is_linked[2 * i]) {
-            ans.seq_len[counter] = strlen(seq);
-            ans.obs_seq[counter] = (char*)malloc(ans.seq_len[counter] + 1);
-            strcpy(ans.obs_seq[counter], seq);
-            ans.ind[counter] = num;
-            ans.head[counter] = (char*)malloc(20);
-            sprintf(ans.head[counter], "%d+", num);
-            ++counter;
-        }
-        if (is_linked[2 * i + 1]){
-            ans.seq_len[counter] = strlen(seq);
-            ans.obs_seq[counter] = (char*)malloc(ans.seq_len[counter] + 1);
-            ans.obs_seq[counter][ans.seq_len[counter]] = '\0';
-            for (j = 0; j < ans.seq_len[counter]; ++j){
-                ans.obs_seq[counter][j] = complementary_nucleotide(seq[ans.seq_len[counter] - j - 1]);
             }
-            //printf("%d; %d", (int)ans.obs_seq[counter][0], (int)'\t');
-            ans.ind[counter] = -num;
-            ans.head[counter] = (char*)malloc(20);
-            sprintf(ans.head[counter], "%d-", num);
-            ++counter;
+            index = get_edge_num(ind, n_segm, num_to, strand_to);
+            if (!is_linked[index]){
+                is_linked[index] = 1;
+                ++ans.n_edge;
+            }
         }
-    }
-    //Making adjacency matrix;
-    while(fgets(line, 500000, f)){
-        sscanf(line, "%c\t%d\t%c\t%d\t%c\t%zuM", &c, &num_from, &strand_from, &num_to, &strand_to, &ans.overlap);
-        size_t ind_from = get_edge_num_m(&ans, num_from, strand_from);
-        size_t ind_to = get_edge_num_m(&ans, num_to, strand_to);
-        ans.adjacency_matrix[ind_from][ind_to] = 1;
-    }
-    //fclose(f);
-    free(is_linked);
-    free(ind);
-    return ans;
+        ans.ind = ivector(ans.n_edge);
+        ans.adjacency_matrix = imatrix(ans.n_edge, ans.n_edge);
+        ans.seq_len = ivector(ans.n_edge);
+        ans.dead_end_flg = ivector(ans.n_edge);
+        ans.obs_seq = (char**)malloc(ans.n_edge * sizeof(char*));
+        ans.head = (char**)malloc(ans.n_edge * sizeof(char*));
+        rewind(f);
+        ///
+        /// The third pass. Save segments in needed strands, make adjacency matrix according to Links.
+        ///
+        size_t counter = 0;
+        for (i = 0; i < n_segm; ++i){
+            fgets(line, 500000, f);
+            sscanf(line, "%c\t%d\t%s", &c, &num, seq);
+            if (is_linked[2 * i]) {
+                ans.seq_len[counter] = strlen(seq);
+                ans.obs_seq[counter] = (char*)malloc(ans.seq_len[counter] + 1);
+                strcpy(ans.obs_seq[counter], seq);
+                ans.ind[counter] = num;
+                ans.head[counter] = (char*)malloc(20);
+                sprintf(ans.head[counter], "%d+", num);
+                ++counter;
+            }
+            if (is_linked[2 * i + 1]){
+                ans.seq_len[counter] = strlen(seq);
+                ans.obs_seq[counter] = (char*)malloc(ans.seq_len[counter] + 1);
+                ans.obs_seq[counter][ans.seq_len[counter]] = '\0';
+                for (j = 0; j < ans.seq_len[counter]; ++j){
+                    ans.obs_seq[counter][j] = complementary_nucleotide(seq[ans.seq_len[counter] - j - 1]);
+                }
+                //printf("%d; %d", (int)ans.obs_seq[counter][0], (int)'\t');
+                ans.ind[counter] = -num;
+                ans.head[counter] = (char*)malloc(20);
+                sprintf(ans.head[counter], "%d-", num);
+                ++counter;
+            }
+        }
+        //Making adjacency matrix;
+        while(fgets(line, 500000, f)){
+            sscanf(line, "%c\t%d\t%c\t%d\t%c\t%zuM", &c, &num_from, &strand_from, &num_to, &strand_to, &ans.overlap);
+            size_t ind_from = get_edge_num_m(&ans, num_from, strand_from);
+            size_t ind_to = get_edge_num_m(&ans, num_to, strand_to);
+            ans.adjacency_matrix[ind_from][ind_to] = 1;
+        }
+        //fclose(f);
+        free(is_linked);
+        free(ind);
+        return ans;
+        */
 }
