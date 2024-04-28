@@ -18,7 +18,8 @@
 //#define I1_debug
 //#define R_state_debug
 //#define E1_state_debug
-#define M_rc_debug
+//#define M_rc_debug
+#define I_inf_error
 
 void dump_memory(void *p, int size);
 
@@ -1848,6 +1849,11 @@ TmpResult insertion_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *c
         //from I
         j = i;
         from = nt2int(curr_res->O[t - 1]);
+#ifdef I_inf_error
+        double prev_alpha = curr_res->alpha[j][t - 1], tr_ii = hmm_ptr->tr[TR_II], tr_i_i = hmm_ptr->tr_I_I[from][to];
+        int tyr = 0;
+        ++tyr;
+#endif
         ans_res.alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_II] - hmm_ptr->tr_I_I[from][to];
         ans_res.path = j;
         ans_res.prev_ind = curr_res->curr_column_prev[j];
