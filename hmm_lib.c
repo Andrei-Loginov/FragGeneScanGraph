@@ -19,7 +19,13 @@
 //#define R_state_debug
 //#define E1_state_debug
 //#define M_rc_debug
-#define I_inf_error
+//#define M_inf
+#define crash67
+//#define printf_head_indices
+//#define fprint_71_prev
+#define print_graph_after_reading
+//#define E1_issue
+#define non_coding_issue
 
 void dump_memory(void *p, int size);
 
@@ -42,17 +48,18 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
     for (i = -1; i < NUM_STATE; ++i) {
         ans.curr_column_prev[i + 1] = -1;
         ans.first_column_prev[i + 1] = -1;
+        ans.tmp_curr_column_prev[i + 1] = -1;
     }
     size_t n_prev= 0 ;
     for (i = 0; i < g->n_edge; ++i){
-        if (g->adjacency_matrix[i][edge_index])
+        if (g->adjacency_matrix[i][edge_index] && g->edge_results[i].calculated_flg)
             ++n_prev;
     }
     int *prev_indices = ivector(n_prev);
     size_t counter = 0;
     g->dead_end_flg[edge_index] = 1;
     for (i = 0; i < g->n_edge; ++i){
-        if (g->adjacency_matrix[i][edge_index]){
+        if (g->adjacency_matrix[i][edge_index] && g->edge_results[i].calculated_flg){
             prev_indices[counter] = i;
             ++counter;
         }
@@ -60,17 +67,44 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
             g->dead_end_flg[edge_index] = 0;
         }
     }
-    //printf("edge = %d\tdead_end_flg = %d\n", edge_index, g->dead_end_flg[edge_index]);
-    ans.path[I6_STATE_1][413] = 0;
     int rbound = ans.len_seq;
     if (!g->dead_end_flg[edge_index]){
         rbound -= g->overlap;
     }
+#ifdef fprint_71_prev
+    // /home/andrei/Documents/Projects/Masters diploma/run_result/debug
+    FILE *prev_file;
+    if (strcmp(g->head[edge_index], "71+") == 0){
+        prev_file = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/71_prev.csv", "w");
+        for (i = 0; i < NUM_STATE; ++i){
+            fprintf(prev_file, "%d,",i);
+        }
+        fprintf(prev_file, "\n");
+        fclose(prev_file);
+    }
+#endif
     for (t = 0; t < rbound; ++t){
         //printf("edge = %d\tt = %d; ", edge_index, t);
         for (i = 0; i < NUM_STATE; ++i){
+#ifdef crash67
+            char *curr_head = g->head[edge_index];
+#endif
             ans.alpha[i][t] = any_state_prob(hmm_ptr, t, i, &ans, g->edge_results, prev_indices, n_prev, g->overlap, whole_genome);
+        }
 
+#ifdef fprint_71_prev
+        if (strcmp(g->head[edge_index], "71+") == 0){
+            prev_file = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/71_prev.csv", "a");
+            for(i = 0; i < NUM_STATE; ++i){
+                fprintf(prev_file, "%d,", ans.curr_column_prev[i + 1]);
+            }
+            fprintf(prev_file, "\n");
+            fclose(prev_file);
+        }
+#endif
+
+        for (i = -1; i < NUM_STATE; ++i){
+            ans.curr_column_prev[i + 1] = ans.tmp_curr_column_prev[i + 1];
         }
     }
     free_ivector(prev_indices);
@@ -96,6 +130,9 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
     }
     fclose(f_path);
 #endif
+#ifdef crash67
+            char *curr_head = g->head[edge_index];
+#endif
     return ans;
 }
 
@@ -104,8 +141,31 @@ void viterbi_graph_dag(HMM *hmm_ptr, Graph* g, int whole_genome) {
     g->order = topological_sort(g->adjacency_matrix, g->n_edge);
     g->edge_results = (ViterbiResult*)malloc(g->n_edge * sizeof (ViterbiResult));
     size_t i;
+    for (i = 0; i < g->n_edge; ++i) {
+        g->edge_results[i].calculated_flg = 0;
+    }
     for (i = 0; i < g->n_edge; ++i){
         g->edge_results[g->order[i]] = viterbi_edge(hmm_ptr, g, g->order[i], whole_genome);
+        g->edge_results[g->order[i]].calculated_flg = 1;
+#ifdef crash67
+        ViterbiResult current_res = g->edge_results[g->order[i]];
+#endif
+#ifdef fprint_71_prev
+        char* curr_head = g->head[g->order[i]];
+        if (strcmp(g->head[g->order[i]], "71+") == 0){
+            ///home/andrei/Documents/Projects/Masters diploma/run_result/debug
+            FILE *fprev = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/prev_71.csv", "w");
+            fprintf(fprev, "ind,first_column_alpha,first_column_prev,last_column_alpha,last_column_prev\n");
+            size_t ind;
+            for (ind = 0; ind < NUM_STATE; ++ind){
+                fprintf(fprev, "%zu,%lf,%d,%lf,%d\n", ind, g->edge_results[g->order[i]].alpha[ind][0],
+                                                           g->edge_results[g->order[i]].first_column_prev[ind + 1],
+                                                           g->edge_results[g->order[i]].alpha[ind][g->edge_results[g->order[i]].len_seq - 1],
+                                                           g->edge_results[g->order[i]].curr_column_prev[ind + 1]);
+            }
+            fclose(fprev);
+        }
+#endif
     }
 }
 
@@ -120,13 +180,28 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
     vpath = (int**)malloc(g->n_edge * sizeof(int*));
     edge_path = (int*)malloc(g->n_edge * sizeof(int));
     alpha = (double**)malloc(g->n_edge * sizeof(double*));
+#ifdef crash67
+    // /home/andrei/Documents/Projects/Masters diploma/run_result/with_graph/multiple_edge
+    char fpath_name[10000];
+    sprintf(fpath_name, "/home/andrei/Documents/Projects/Masters diploma/run_result/with_graph/multiple_edge/%s_ep.txt", g->head[start]);
+    FILE *f_ep = fopen(fpath_name, "w");
+    fclose(f_ep);
+#endif
+
     while (curr_edge != -1){
+
+
+#ifdef crash67
+        FILE *f_app = fopen(fpath_name, "a");
+        fprintf(f_app, "%s\n", g->head[curr_edge]);
+        fclose(f_app);
+#endif
         ans.seq_len += (g->dead_end_flg[curr_edge]) ? res[curr_edge].len_seq : res[curr_edge].len_seq - g->overlap;
         vpath[edge_counter] = (int*)malloc(res[curr_edge].len_seq * sizeof(int));
         alpha[edge_counter] = (double*)malloc(res[curr_edge].len_seq * sizeof(double));
         edge_path[edge_counter] = curr_edge;
         curr_len_seq = (g->dead_end_flg[curr_edge]) ? res[curr_edge].len_seq : res[curr_edge].len_seq - g->overlap;
-        printf("edge_counter = %d, head = %s\n", edge_counter, g->head[curr_edge]);
+        //printf("edge_counter = %d, head = %s\n", edge_counter, g->head[curr_edge]);
         if (edge_counter == 0){ //the last edge
             vpath[edge_counter][curr_len_seq - 1] = 0;
             for (i = 0; i < num_state; ++i){
@@ -137,11 +212,21 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
         } else {
             vpath[edge_counter][curr_len_seq - 1] = vertex_path;
         }
+        int prev_vpath, curr_vpath;
+        //char *head = g->head[curr_edge];
+        //double prev_alpha;
         alpha[edge_counter][curr_len_seq - 1] = res[curr_edge].alpha[vpath[edge_counter][curr_len_seq - 1]][curr_len_seq - 1];
         for (t = curr_len_seq - 2; t >= 0; --t){
+            //prev_vpath = curr_vpath;
             vpath[edge_counter][t] = res[curr_edge].path[vpath[edge_counter][t + 1]][t + 1];
+            curr_vpath = vpath[edge_counter][t];
             alpha[edge_counter][t] = res[curr_edge].alpha[vpath[edge_counter][t]][t];
         }
+#ifdef crash67
+        if (strcmp(g->head[curr_edge], "71+") == 0){
+            printf("sequence 71+\tfirst_column_opt_alpha = %lf\n", alpha[edge_counter][0]);
+        }
+#endif
         vertex_path = res[curr_edge].path[vpath[edge_counter][0]][0];
         curr_edge = res[curr_edge].curr_column_prev[vpath[edge_counter][curr_len_seq - 1] + 1];
         //printf("New curr_edge = %d\n", curr_edge);
@@ -166,6 +251,7 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
     free(vpath);
     free(alpha);
     free(edge_path);
+    printf("%s\tSeq_len = %zu\n", g->head[start], strlen(ans.O));
     return ans;
 }
 
@@ -1333,8 +1419,14 @@ double any_state_prob(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, Viter
                         return max_dbl + 1;
                 }
 
-                if (j == 0 || temp.alpha < ans_res.alpha) {
-                    ans_res = temp;
+                if (group == E_GROUP || group == S_GROUP || group == E_GROUP_1 || group == S_GROUP_1){
+                    if (j == 0 || temp.alpha2 < ans_res.alpha2) {
+                        ans_res = temp;
+                    }
+                } else {
+                    if (j == 0 || temp.alpha < ans_res.alpha) {
+                        ans_res = temp;
+                    }
                 }
             }
 
@@ -1401,12 +1493,22 @@ double any_state_prob(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, Viter
 
     }
 
-    curr_res->curr_column_prev[i + 1] = ans_res.prev_ind;
+    curr_res->tmp_curr_column_prev[i + 1] = ans_res.prev_ind;
+    //curr_res->curr_column_prev[i + 1] = ans_res.prev_ind;
     curr_res->path[i][t] = ans_res.path;
     if (t == 0) {
         curr_res->first_column_prev[i + 1] = ans_res.prev_ind;
     }
     //curr_res->alpha[i][t] = ans_res.alpha;
+#ifdef crash67
+    if (t == 0 && (ans_res.prev_ind == 17 || ans_res.prev_ind == 19)) {
+        int some_variable = 7;
+        some_variable += 3;
+        --some_variable;
+        int prev_check = curr_res->first_column_prev[i + 1];
+        printf("71 first column %d\n", prev_check);
+    }
+#endif
     return ans_res.alpha;
 }
 
@@ -1426,6 +1528,7 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
     char* O = curr_res->O, *prev_O;// = prev_res ? prev_res[prev_ind].O : NULL;
     int *temp_i = curr_res->temp_i, *prev_temp_i; //= prev_res ? prev_res[prev_ind].temp_i : NULL;
 
+
     if (t == 0 && n_prev == 0){
         ans_res.alpha = -hmm_ptr->pi[i];
         ans_res.alpha2 = 0;
@@ -1434,9 +1537,6 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
     } else if (curr_res->alpha[i][t] < max_dbl ){ //t > 0 || prev_res
         int from2;
         char prev1, prev2;
-        //prev1 = (t >= 1) ? O[t - 1] : (prev_res ? prev_O[prev_seq_len - 1] : -1);
-        //prev2 = (t >= 2) ? O[t - 2] : (prev_res ? prev_O[prev_seq_len + (t - 2)] : -1);
-        //from2 = (prev2 == -1 ? 2 : nt2int(prev2)) * 4 + nt2int(prev1);
 
         if (i == M1_STATE) {
             //from M
@@ -1459,7 +1559,7 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 
             //from D
             if (whole_genome == 0) {
-                for (j = M5_STATE; j>= M1_STATE; --j){
+                for (j = M5_STATE; j> M1_STATE; --j){
                     num_d = i - j + 6;
 
                     if (t == 0) {
@@ -1500,6 +1600,7 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
 
             alpha1 = (t == 0) ? prev_alpha[S_STATE][prev_seq_len - 1] : alpha[S_STATE][t - 1];
             temp.alpha = alpha1 - hmm_ptr->e_M[0][from2][to];
+
             if (temp.alpha < ans_res.alpha) {
                 ans_res.alpha = temp.alpha;
                 ans_res.path = S_STATE;
@@ -1524,6 +1625,11 @@ TmpResult match_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_
             ans_res.alpha = alpha1 - hmm_ptr->tr[TR_MM] - hmm_ptr->e_M[i - M1_STATE][from2][to];
             ans_res.path = j;
             ans_res.prev_ind = (t == 0) ? prev_ind : curr_res->curr_column_prev[j + 1];
+#ifdef crash67
+            if (t == 1 && (ans_res.prev_ind == 17 || ans_res.prev_ind == 19)){
+                 printf("sequence 71, t = 1, M_STATE\n");
+            }
+#endif
 
             //from D
             if (whole_genome == 0) {
@@ -1960,7 +2066,12 @@ TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
         ans_res.alpha = prev_alpha[j][prev_seq_len - 1] - hmm_ptr->tr[TR_RR] - hmm_ptr->tr_R_R[from][to];
         ans_res.path = j;
         ans_res.prev_ind = prev_index;
-
+#ifdef crash67
+        double tr_rr = hmm_ptr->tr[TR_RR], tr_r_r = hmm_ptr->tr_R_R[from][to], last_alpha  = prev_alpha[j][prev_seq_len- 1];
+        tr_rr *= 1;
+        int musor;
+        ++musor;
+#endif
         //from E
         j = E_STATE;
 
@@ -1986,6 +2097,14 @@ TmpResult non_coding_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *
         ans_res.alpha = curr_res->alpha[j][t - 1] - hmm_ptr->tr[TR_RR] - hmm_ptr->tr_R_R[from][to];
         ans_res.path = j;
         ans_res.prev_ind = curr_res->curr_column_prev[j + 1];
+#ifdef non_coding_issue
+        if (curr_res->len_seq > 16000 && t == 1) {
+            double tr_rr = hmm_ptr->tr[TR_RR], tr_r_r = hmm_ptr->tr_R_R[from][to], last_alpha  = curr_res->alpha[j][t - 1];
+            tr_rr *= 1;
+            int musor;
+            ++musor;
+        }
+#endif
 
         //from E
         j = E_STATE;
@@ -2043,7 +2162,7 @@ TmpResult end_state_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_re
                  (O[t + 1] == 'A' && O[t + 2] == 'G') ||
                  (O[t + 1] == 'G' && O[t + 2] == 'A'))){
 
-                ans_res.alpha2 = max_dbl;
+                ans_res.alpha2 = 2 * max_dbl;
                 //transition from M6
                 if(t == 0) {
                     //since t == 0 we now the edge which we consider to be previos
@@ -2231,6 +2350,14 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
         ans_res.path = 0;
         ans_res.prev_ind = -1;
     } else {
+#ifdef E1_issue
+      if (t > 16955 && t < 16965){
+          double curr_alpha = alpha[E_STATE_1][t];
+          char c_0 = curr_res->O[t], c_1 = curr_res->O[t + 1], c_2 = curr_res->O[t + 2], c_3 = curr_res->O[t + 3];
+          int empty_var = -1;
+          printf("Empty_var %d\n", empty_var);
+      }
+#endif
         if (alpha[E_STATE_1][t] == 0) {
             ans_res.alpha = max_dbl;
             ans_res.path = NOSTATE;
@@ -2269,7 +2396,7 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
                 } else {
                     prev_O = (t == 0) ? prev_res[prev_index].O : prev_res[curr_res->curr_column_prev[ans_res.path + 1]].O;
                     prev_seq_len = (t == 0) ? prev_res[prev_index].len_seq - overlap : prev_res[ans_res.prev_ind].len_seq - overlap;
-                    lbound = min(t, 30);
+                    lbound = min(t + prev_seq_len, 30);
                     char nt1, nt2, nt3;
                     for (i = -lbound; i <= 30; ++i){
                         nt1 = (t + i >= 0) ? O[t + i] : prev_O[prev_seq_len + t + i];
@@ -2290,6 +2417,18 @@ TmpResult end_state1_prob_eval(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_r
                     p_kd = 0.99;
                 }
                 ans_res.alpha2 -= log(p_kd);
+#ifdef  E1_state_debug
+                if (t == 9 || t == 107){
+                    char codone[4];
+                    codone[3] = '\0';
+                    codone[2] = curr_res->O[t + 2];
+                    codone[1] = curr_res->O[t + 1];
+                    codone[0] = curr_res->O[t + 0];
+                    int xxl = 12;
+                    ++xxl;
+                    --xxl;
+              }
+#endif
             }
         } else {
             ans_res.alpha = alpha[E_STATE_1][t];
@@ -2564,102 +2703,24 @@ Graph read_gfa(FILE *f){
         //printf("%d%c; %d%c; %zu; %zu\n", num_from, strand_from, num_to, strand_to, ind_from, ind_to);
         ans.adjacency_matrix[ind_from][ind_to] = 1;
         //reverse-complementary
+        //if the straight strand was '+' then
         ind_from += (strand_from == '+') ? 1 : -1;
         ind_to += (strand_to == '+') ? 1 : -1;
         //printf("%d%c; %d%c; %zu; %zu\n", num_to, (strand_to == '+') ? '-' : '+', num_from, (strand_from == '+') ? '-' : '+', ind_to, ind_from);
         ans.adjacency_matrix[ind_to][ind_from] = 1;
     }
+#ifdef printf_head_indices
+    FILE *headf = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/head_ind.txt", "w");
+    for (i = 0; i < ans.n_edge; ++i){
+        fprintf(headf, "index = %uz\t%s", i, ans.head[i]);
+    }
+#endif
+#ifdef print_graph_after_reading
+    FILE *outf = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/read_summary.txt", "w");
+    for (i = 0; i < ans.n_edge; ++i){
+        fprintf(outf, "i = %d\t%s\t%zu\n", i, ans.head[i], strlen(ans.obs_seq[i]));
+    }
+    fclose(outf);
+#endif
     return ans;
-    /*
-    Graph ans;
-    ans.n_edge = 0;
-    //FILE *f = fopen(fname, "r");
-    char line[500000], c;
-    size_t i, j, seq_len, n_segm = 0;
-    int num;
-    ///
-    /// First pass. Count number of segments;
-    ///
-    fgets(line, 500000, f);
-    while (line[0] == 'S'){
-        //sscanf(line, "%c\t%d\t%s", &c, &num, )
-        ++n_segm;
-        fgets(line, 500000, f);
-    }
-    int *is_linked = ivector(n_segm * 2);
-    int *ind = ivector(n_segm);
-    rewind(f);
-    ///
-    /// Second pass. Write sefment numbers, write which segment in which strand is used in graph.
-    ///
-    for (i = 0; i < n_segm; ++i){
-        fgets(line, 500000, f);
-        sscanf(line, "%c\t%d\t", &c, &num);
-        ind[i] = num;
-    }
-
-    char seq[500000], strand_from, strand_to;
-    int num_from ,num_to;
-    while(fgets(line, 500000, f)){
-        sscanf(line, "%c\t%d\t%c\t%d\t%c", &c, &num_from, &strand_from, &num_to, &strand_to);
-        size_t index = get_edge_num(ind, n_segm, num_from, strand_from);
-        if (!is_linked[index]){
-            is_linked[index] = 1;
-            ++ans.n_edge;
-            }
-            index = get_edge_num(ind, n_segm, num_to, strand_to);
-            if (!is_linked[index]){
-                is_linked[index] = 1;
-                ++ans.n_edge;
-            }
-        }
-        ans.ind = ivector(ans.n_edge);
-        ans.adjacency_matrix = imatrix(ans.n_edge, ans.n_edge);
-        ans.seq_len = ivector(ans.n_edge);
-        ans.dead_end_flg = ivector(ans.n_edge);
-        ans.obs_seq = (char**)malloc(ans.n_edge * sizeof(char*));
-        ans.head = (char**)malloc(ans.n_edge * sizeof(char*));
-        rewind(f);
-        ///
-        /// The third pass. Save segments in needed strands, make adjacency matrix according to Links.
-        ///
-        size_t counter = 0;
-        for (i = 0; i < n_segm; ++i){
-            fgets(line, 500000, f);
-            sscanf(line, "%c\t%d\t%s", &c, &num, seq);
-            if (is_linked[2 * i]) {
-                ans.seq_len[counter] = strlen(seq);
-                ans.obs_seq[counter] = (char*)malloc(ans.seq_len[counter] + 1);
-                strcpy(ans.obs_seq[counter], seq);
-                ans.ind[counter] = num;
-                ans.head[counter] = (char*)malloc(20);
-                sprintf(ans.head[counter], "%d+", num);
-                ++counter;
-            }
-            if (is_linked[2 * i + 1]){
-                ans.seq_len[counter] = strlen(seq);
-                ans.obs_seq[counter] = (char*)malloc(ans.seq_len[counter] + 1);
-                ans.obs_seq[counter][ans.seq_len[counter]] = '\0';
-                for (j = 0; j < ans.seq_len[counter]; ++j){
-                    ans.obs_seq[counter][j] = complementary_nucleotide(seq[ans.seq_len[counter] - j - 1]);
-                }
-                //printf("%d; %d", (int)ans.obs_seq[counter][0], (int)'\t');
-                ans.ind[counter] = -num;
-                ans.head[counter] = (char*)malloc(20);
-                sprintf(ans.head[counter], "%d-", num);
-                ++counter;
-            }
-        }
-        //Making adjacency matrix;
-        while(fgets(line, 500000, f)){
-            sscanf(line, "%c\t%d\t%c\t%d\t%c\t%zuM", &c, &num_from, &strand_from, &num_to, &strand_to, &ans.overlap);
-            size_t ind_from = get_edge_num_m(&ans, num_from, strand_from);
-            size_t ind_to = get_edge_num_m(&ans, num_to, strand_to);
-            ans.adjacency_matrix[ind_from][ind_to] = 1;
-        }
-        //fclose(f);
-        free(is_linked);
-        free(ind);
-        return ans;
-        */
 }

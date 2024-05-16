@@ -126,6 +126,8 @@ typedef struct {
     int *temp_i_1;
     int first_column_prev[NUM_STATE + 1];
     int curr_column_prev[NUM_STATE + 1];
+    int tmp_curr_column_prev[NUM_STATE + 1];
+    int calculated_flg;
 } ViterbiResult;
 
 typedef struct {
