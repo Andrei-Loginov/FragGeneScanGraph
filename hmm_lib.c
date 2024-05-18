@@ -25,7 +25,9 @@
 //#define fprint_71_prev
 #define print_graph_after_reading
 //#define E1_issue
-#define non_coding_issue
+//#define non_coding_issue
+#define non_utf8_issue
+
 
 void dump_memory(void *p, int size);
 
@@ -71,18 +73,7 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
     if (!g->dead_end_flg[edge_index]){
         rbound -= g->overlap;
     }
-#ifdef fprint_71_prev
-    // /home/andrei/Documents/Projects/Masters diploma/run_result/debug
-    FILE *prev_file;
-    if (strcmp(g->head[edge_index], "71+") == 0){
-        prev_file = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/71_prev.csv", "w");
-        for (i = 0; i < NUM_STATE; ++i){
-            fprintf(prev_file, "%d,",i);
-        }
-        fprintf(prev_file, "\n");
-        fclose(prev_file);
-    }
-#endif
+
     for (t = 0; t < rbound; ++t){
         //printf("edge = %d\tt = %d; ", edge_index, t);
         for (i = 0; i < NUM_STATE; ++i){
@@ -91,17 +82,6 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
 #endif
             ans.alpha[i][t] = any_state_prob(hmm_ptr, t, i, &ans, g->edge_results, prev_indices, n_prev, g->overlap, whole_genome);
         }
-
-#ifdef fprint_71_prev
-        if (strcmp(g->head[edge_index], "71+") == 0){
-            prev_file = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/71_prev.csv", "a");
-            for(i = 0; i < NUM_STATE; ++i){
-                fprintf(prev_file, "%d,", ans.curr_column_prev[i + 1]);
-            }
-            fprintf(prev_file, "\n");
-            fclose(prev_file);
-        }
-#endif
 
         for (i = -1; i < NUM_STATE; ++i){
             ans.curr_column_prev[i + 1] = ans.tmp_curr_column_prev[i + 1];
@@ -149,22 +129,6 @@ void viterbi_graph_dag(HMM *hmm_ptr, Graph* g, int whole_genome) {
         g->edge_results[g->order[i]].calculated_flg = 1;
 #ifdef crash67
         ViterbiResult current_res = g->edge_results[g->order[i]];
-#endif
-#ifdef fprint_71_prev
-        char* curr_head = g->head[g->order[i]];
-        if (strcmp(g->head[g->order[i]], "71+") == 0){
-            ///home/andrei/Documents/Projects/Masters diploma/run_result/debug
-            FILE *fprev = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/prev_71.csv", "w");
-            fprintf(fprev, "ind,first_column_alpha,first_column_prev,last_column_alpha,last_column_prev\n");
-            size_t ind;
-            for (ind = 0; ind < NUM_STATE; ++ind){
-                fprintf(fprev, "%zu,%lf,%d,%lf,%d\n", ind, g->edge_results[g->order[i]].alpha[ind][0],
-                                                           g->edge_results[g->order[i]].first_column_prev[ind + 1],
-                                                           g->edge_results[g->order[i]].alpha[ind][g->edge_results[g->order[i]].len_seq - 1],
-                                                           g->edge_results[g->order[i]].curr_column_prev[ind + 1]);
-            }
-            fclose(fprev);
-        }
 #endif
     }
 }
@@ -242,6 +206,11 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
             ans.vpath[counter] = vpath[i][j];
             ans.alpha[counter] = alpha[i][j];
             ans.O[counter] = res[edge_path[i]].O[j];
+#ifdef non_utf8_issue
+            if (ans.O[counter] != 'A' && ans.O[counter] != 'T' && ans.O[counter] != 'G' && ans.O[counter] != 'C' && ans.O[counter] != '\n' && ans.O[counter] != '\0'){
+                printf("Non unicode symbol! %d\n", (int)ans.O[counter]);
+            }
+#endif
         }
     }
     for (i = 0; i < edge_counter; ++i){
@@ -427,29 +396,35 @@ void backtrack_graph_path(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp
                             dna[end_t - start_t + 1] = 0;
                         }
                     }
-                    fprintf(fp_out, "%d\t%d\t+\t%d\t%lf\t", start_t, end_t, frame, final_score);
-                    fprintf(fp_out, "I:");
-                    for (i=0; i<insert_id; i++){
-                        fprintf(fp_out, "%d,", insert[i]);
-                    }
-                    fprintf(fp_out, "\tD:");
-                    for (i=0; i<delete_id; i++){
-                        fprintf(fp_out, "%d,", delete[i]);
-                    }
-                    fprintf(fp_out, "\n");
+                    if (check_dna_symbols(dna)) {
+                        fprintf(fp_out, "%d\t%d\t+\t%d\t%lf\t", start_t, end_t, frame, final_score);
+                        fprintf(fp_out, "I:");
+                        for (i=0; i<insert_id; i++){
+                            fprintf(fp_out, "%d,", insert[i]);
+                        }
+                        fprintf(fp_out, "\tD:");
+                        for (i=0; i<delete_id; i++){
+                            fprintf(fp_out, "%d,", delete[i]);
+                        }
+                        fprintf(fp_out, "\n");
 
-                    fprintf(fp_aa, "%s_%d_%d_+\n", head_short, start_t, end_t);
-                    fprintf(fp_dna, "%s_%d_%d_+\n", head_short, start_t, end_t);
+                        fprintf(fp_aa, "%s_%d_%d_+\n", head_short, start_t, end_t);
+                        fprintf(fp_dna, "%s_%d_%d_+\n", head_short, start_t, end_t);
 
-                    //printf("dna-start %c%c%c exp %c%c%c (%c%c%c)\n", dna[0], dna[1], dna[2], O[start_t-1], O[start_t], O[start_t+1], O[start_t+2], O[start_t+3], O[start_t+4]);
-                    //printf("dna-len %d start_t %d end_t %d exp-len %d diff %d\n", strlen(dna), start_t, end_t, end_t - start_t + 1, end_t - start_t + 1 - strlen(dna));
-                    get_protein(dna,protein,1, whole_genome);
-                    fprintf(fp_aa, "%s\n", protein);
-                    if (format==0){
-                        fprintf(fp_dna, "%s\n", dna);
-                    }else if (format==1){
-                        fprintf(fp_dna, "%s\n", dna_f);
+                        get_protein(dna,protein,1, whole_genome);
+                        fprintf(fp_aa, "%s\n", protein);
+                        if (format==0){
+                            fprintf(fp_dna, "%s\n", dna);
+                        }else if (format==1){
+                            fprintf(fp_dna, "%s\n", dna_f);
+                        }
+#ifdef non_utf8_issue
+                        if(!check_dna_symbols(dna) || !check_dna_symbols(dna_f)){
+                            printf("Bad gene\n");
+                        }
+#endif
                     }
+
                 } else if (codon_start==-1){
                     //printf("reverse strand dna-len %d, start_t %d, dna_start %d, add-up %d, end_t %d\n", strlen(dna), start_t, dna_start_t, dna_start_t + strlen(dna), end_t);
                     //getchar();
@@ -2724,3 +2699,13 @@ Graph read_gfa(FILE *f){
 #endif
     return ans;
 }
+
+
+int check_dna_symbols(char* str){
+    size_t i;
+    for (i = 0; i < strlen(str); ++i)
+        if (str[i] != 'A' && str[i] != 'T' && str[i] != 'G' && str[i] != 'C' && str[i] != '\0' && str[i] != '\n')
+            return 0;
+    return 1;
+}
+

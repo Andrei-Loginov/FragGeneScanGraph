@@ -204,6 +204,8 @@ void get_protein(char *dna, char *protein, int strand, int whole_genome);
 void get_rc_dna(char *dna, char *dna1);
 void get_corrected_dna(char *dna, char *dna_f);
 
+int check_dna_symbols(char* str);
+
 
 char complementary_nucleotide(char c);
 size_t get_edge_num_m(Graph *g, int ind, char strand);

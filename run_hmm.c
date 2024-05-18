@@ -243,11 +243,23 @@ int main (int argc, char **argv)
     cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
     viterbi_graph_dag(&hmm, &g, wholegenome);
     fprint_imatrix(g.adjacency_matrix, g.n_edge, g.n_edge, "some_out_file.txt");
+
+    ///
+    /// Restore pathes
+    ///
+
+    int *has_ancestor_flg = ivector(g.n_edge);
     for (i = 0; i < g.n_edge; ++i){
-        if (g.dead_end_flg[i]){
+        for (j = 1; j < NUM_STATE + 1; ++j){
+            int prev_ind = g.edge_results[i].first_column_prev[j];
+            if (prev_ind > -1 && prev_ind < g.n_edge)
+                has_ancestor_flg[prev_ind] = 1;
+        }
+    }
+
+    for (i = 0; i < g.n_edge; ++i){
+        if (/*g.dead_end_flg[i]*/  !has_ancestor_flg[i]){
             GraphPath ans = restore_path(g.edge_results, &g, i, NUM_STATE);
-            //printf("Ans id\n%s\n", ans.O);
-            //print_ivector(ans.vpath, ans.seq_len);
             backtrack_graph_path(&hmm, &train, fp_out, fp_aa, fp_dna, g.head[i], wholegenome, cg_count, format, &ans);
         }
     }
