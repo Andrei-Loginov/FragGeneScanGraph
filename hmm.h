@@ -140,6 +140,7 @@ typedef struct {
     char** head;
     int *ind;
     int *order;
+    int *used_backtrack;
     ViterbiResult *edge_results;
 } Graph;
 
@@ -205,6 +206,7 @@ void get_rc_dna(char *dna, char *dna1);
 void get_corrected_dna(char *dna, char *dna_f);
 
 int check_dna_symbols(char* str);
+int is_fully_computed(int **viterbi_matrix, int n_state, int seq_len, int overlap);
 
 
 char complementary_nucleotide(char c);

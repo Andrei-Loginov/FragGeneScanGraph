@@ -147,13 +147,13 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
 #ifdef crash67
     // /home/andrei/Documents/Projects/Masters diploma/run_result/with_graph/multiple_edge
     char fpath_name[10000];
-    sprintf(fpath_name, "/home/andrei/Documents/Projects/Masters diploma/run_result/with_graph/multiple_edge/%s_ep.txt", g->head[start]);
+    sprintf(fpath_name, "/home/andrei/Documents/Projects/Masters diploma/run_result/with_graph/multiple_edge/trajectory/%s_ep.txt", g->head[start]);
     FILE *f_ep = fopen(fpath_name, "w");
     fclose(f_ep);
 #endif
 
     while (curr_edge != -1){
-
+        g->used_backtrack[curr_edge] = 1;
 
 #ifdef crash67
         FILE *f_app = fopen(fpath_name, "a");
@@ -2684,12 +2684,7 @@ Graph read_gfa(FILE *f){
         //printf("%d%c; %d%c; %zu; %zu\n", num_to, (strand_to == '+') ? '-' : '+', num_from, (strand_from == '+') ? '-' : '+', ind_to, ind_from);
         ans.adjacency_matrix[ind_to][ind_from] = 1;
     }
-#ifdef printf_head_indices
-    FILE *headf = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/head_ind.txt", "w");
-    for (i = 0; i < ans.n_edge; ++i){
-        fprintf(headf, "index = %uz\t%s", i, ans.head[i]);
-    }
-#endif
+    ans.used_backtrack = ivector(ans.n_edge);
 #ifdef print_graph_after_reading
     FILE *outf = fopen("/home/andrei/Documents/Projects/Masters diploma/run_result/debug/read_summary.txt", "w");
     for (i = 0; i < ans.n_edge; ++i){
@@ -2709,3 +2704,11 @@ int check_dna_symbols(char* str){
     return 1;
 }
 
+int is_fully_computed(int **viterbi_matrix, int n_state, int seq_len, int overlap){
+    int i;
+    for (i = 0; i < n_state; ++i){
+        if (viterbi_matrix[i][seq_len - overlap] != 0)
+            return 1;
+    }
+    return 0;
+}
