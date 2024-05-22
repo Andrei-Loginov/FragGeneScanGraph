@@ -241,7 +241,7 @@ int main (int argc, char **argv)
     */
     g = read_gfa(fp);
     cg_count = get_prob_form_cg_graph(&hmm, &train, &g);
-    viterbi_graph_dag(&hmm, &g, wholegenome);
+    viterbi_graph_cycle(&hmm, &g, wholegenome);
     fprint_imatrix(g.adjacency_matrix, g.n_edge, g.n_edge, "some_out_file.txt");
 
     ///

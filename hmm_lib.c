@@ -118,7 +118,23 @@ ViterbiResult viterbi_edge(HMM *hmm_ptr, Graph *g, size_t edge_index, int whole_
 
 void viterbi_graph_dag(HMM *hmm_ptr, Graph* g, int whole_genome) {
     //assuming that adjacency matrix is upper triangular
-    g->order = topological_sort(g->adjacency_matrix, g->n_edge);
+        g->order = topological_sort(g->adjacency_matrix, g->n_edge);
+        g->edge_results = (ViterbiResult*)malloc(g->n_edge * sizeof (ViterbiResult));
+        size_t i;
+        for (i = 0; i < g->n_edge; ++i) {
+            g->edge_results[i].calculated_flg = 0;
+        }
+        for (i = 0; i < g->n_edge; ++i){
+            g->edge_results[g->order[i]] = viterbi_edge(hmm_ptr, g, g->order[i], whole_genome);
+            g->edge_results[g->order[i]].calculated_flg = 1;
+#ifdef crash67
+        ViterbiResult current_res = g->edge_results[g->order[i]];
+#endif
+        }
+}
+
+void viterbi_graph_cycle(HMM *hmm_ptr, Graph* g, int whole_genome){
+    g->order = ordering(g->adjacency_matrix, g->n_edge);
     g->edge_results = (ViterbiResult*)malloc(g->n_edge * sizeof (ViterbiResult));
     size_t i;
     for (i = 0; i < g->n_edge; ++i) {
@@ -127,9 +143,6 @@ void viterbi_graph_dag(HMM *hmm_ptr, Graph* g, int whole_genome) {
     for (i = 0; i < g->n_edge; ++i){
         g->edge_results[g->order[i]] = viterbi_edge(hmm_ptr, g, g->order[i], whole_genome);
         g->edge_results[g->order[i]].calculated_flg = 1;
-#ifdef crash67
-        ViterbiResult current_res = g->edge_results[g->order[i]];
-#endif
     }
 }
 
