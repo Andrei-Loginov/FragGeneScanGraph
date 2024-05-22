@@ -206,7 +206,7 @@ void get_rc_dna(char *dna, char *dna1);
 void get_corrected_dna(char *dna, char *dna_f);
 
 int check_dna_symbols(char* str);
-int is_fully_computed(int **viterbi_matrix, int n_state, int seq_len, int overlap);
+int is_fully_computed(double **viterbi_matrix, int n_state, int seq_len, int overlap);
 
 
 char complementary_nucleotide(char c);
@@ -217,4 +217,6 @@ Graph read_gfa(FILE *f);
 Graph read_graph(FILE* fp, FILE* fp_matr);
 int *topological_sort(int **adj_matrix, int n_vert);
 void dfs(int **adj_matrix, int n_vert, int *used, int *ans, int *curr_len, int ind);
+void tarjan_scc(int **adj_matrix, int n_vert, int v, Stack *st, int *index, int *curr_index, int *lowlink, int *onStack, Stack *rev_order);
+int *ordering(int **adj_matrix, int n_vert);
 void free_graph(Graph* g);

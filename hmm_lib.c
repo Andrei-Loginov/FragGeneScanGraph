@@ -160,12 +160,13 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
         fprintf(f_app, "%s\n", g->head[curr_edge]);
         fclose(f_app);
 #endif
+        int fully_calc_flg = is_fully_computed(res->alpha, NUM_STATE, res->len_seq, g->overlap);
         ans.seq_len += (g->dead_end_flg[curr_edge]) ? res[curr_edge].len_seq : res[curr_edge].len_seq - g->overlap;
         vpath[edge_counter] = (int*)malloc(res[curr_edge].len_seq * sizeof(int));
         alpha[edge_counter] = (double*)malloc(res[curr_edge].len_seq * sizeof(double));
         edge_path[edge_counter] = curr_edge;
         curr_len_seq = (g->dead_end_flg[curr_edge]) ? res[curr_edge].len_seq : res[curr_edge].len_seq - g->overlap;
-        //printf("edge_counter = %d, head = %s\n", edge_counter, g->head[curr_edge]);
+
         if (edge_counter == 0){ //the last edge
             vpath[edge_counter][curr_len_seq - 1] = 0;
             for (i = 0; i < num_state; ++i){
@@ -186,11 +187,6 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
             curr_vpath = vpath[edge_counter][t];
             alpha[edge_counter][t] = res[curr_edge].alpha[vpath[edge_counter][t]][t];
         }
-#ifdef crash67
-        if (strcmp(g->head[curr_edge], "71+") == 0){
-            printf("sequence 71+\tfirst_column_opt_alpha = %lf\n", alpha[edge_counter][0]);
-        }
-#endif
         vertex_path = res[curr_edge].path[vpath[edge_counter][0]][0];
         curr_edge = res[curr_edge].curr_column_prev[vpath[edge_counter][curr_len_seq - 1] + 1];
         //printf("New curr_edge = %d\n", curr_edge);
@@ -206,11 +202,6 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
             ans.vpath[counter] = vpath[i][j];
             ans.alpha[counter] = alpha[i][j];
             ans.O[counter] = res[edge_path[i]].O[j];
-#ifdef non_utf8_issue
-            if (ans.O[counter] != 'A' && ans.O[counter] != 'T' && ans.O[counter] != 'G' && ans.O[counter] != 'C' && ans.O[counter] != '\n' && ans.O[counter] != '\0'){
-                printf("Non unicode symbol! %d\n", (int)ans.O[counter]);
-            }
-#endif
         }
     }
     for (i = 0; i < edge_counter; ++i){
@@ -1475,15 +1466,6 @@ double any_state_prob(HMM *hmm_ptr, int t, int i, ViterbiResult *curr_res, Viter
         curr_res->first_column_prev[i + 1] = ans_res.prev_ind;
     }
     //curr_res->alpha[i][t] = ans_res.alpha;
-#ifdef crash67
-    if (t == 0 && (ans_res.prev_ind == 17 || ans_res.prev_ind == 19)) {
-        int some_variable = 7;
-        some_variable += 3;
-        --some_variable;
-        int prev_check = curr_res->first_column_prev[i + 1];
-        printf("71 first column %d\n", prev_check);
-    }
-#endif
     return ans_res.alpha;
 }
 
@@ -2704,11 +2686,76 @@ int check_dna_symbols(char* str){
     return 1;
 }
 
-int is_fully_computed(int **viterbi_matrix, int n_state, int seq_len, int overlap){
+int is_fully_computed(double **viterbi_matrix, int n_state, int seq_len, int overlap){
     int i;
     for (i = 0; i < n_state; ++i){
         if (viterbi_matrix[i][seq_len - overlap] != 0)
             return 1;
     }
     return 0;
+}
+
+void tarjan_scc(int **adj_matrix, int n_vert, int v, Stack *st, int *index, int *curr_index, int *lowlink, int *onStack, Stack *rev_order){
+    index[v] = *curr_index;
+    lowlink[v] = *curr_index;
+    ++(*curr_index);
+
+    push(st, v);
+    onStack[v] = 1;
+
+    int i, w;
+    for (i = 0; i < n_vert; ++i){
+        if (adj_matrix[v][i] == 1){
+            w = i;
+            if (index[w] == -1) {
+                tarjan_scc(adj_matrix, n_vert, w, st, index, curr_index, lowlink, onStack, rev_order);
+                lowlink[v] = min(lowlink[v], lowlink[w]);
+            } else if (onStack[w]){
+                lowlink[v] = min(lowlink[v], index[w]);
+            }
+        }
+    }
+
+    if (index[v] == lowlink[v]){
+        //printf("scc: ");
+        while (st->curr_capacity > 0){
+            w = pop(st);
+            onStack[w] = 0;
+            push(rev_order, w);
+            //printf("%d ", w);
+            if (w == v){
+            //    printf("\n");
+                break;
+            }
+        }
+    }
+}
+
+int *ordering(int **adj_matrix, int n_vert){
+    int *index = (int*)malloc(n_vert * sizeof(int));
+    int *lowlink = (int*)malloc(n_vert * sizeof(int));
+    int *onStack = (int*)malloc(n_vert * sizeof(int));
+    int *ans = (int*)malloc(n_vert * sizeof(int));
+    Stack reverse_order = create_stack();
+    int curr_index = 0;
+    int i;
+    for (i = 0; i < n_vert; ++i){
+        index[i] = -1;
+        lowlink[i] = -1;
+        onStack[i] = 0;
+    }
+
+    Stack st = create_stack();
+    for (i = 0; i < n_vert; ++i){
+        if (index[i] == -1){
+            tarjan_scc(adj_matrix, n_vert, i, &st, index, &curr_index, lowlink, onStack, &reverse_order);
+        }
+    }
+    for (i = 0; i < n_vert; ++i){
+        ans[i] = pop(&reverse_order);
+    }
+    free(index);
+    free(lowlink);
+    free(onStack);
+    return  ans;
 }

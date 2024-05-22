@@ -268,8 +268,17 @@ int main (int argc, char **argv)
     }
 */
     for (i = 0; i < g.n_edge; ++i){
-        if(g.used_backtrack[i] == 0)
-            printf("%s\t%d\n", g.head[i], g.seq_len[i]);
+        if(g.used_backtrack[i] == 0){
+            //printf("%s\t%d\n", g.head[i], g.seq_len[i]);
+            GraphPath ans = restore_path(g.edge_results, &g, i, NUM_STATE);
+            backtrack_graph_path(&hmm, &train, fp_out, fp_aa, fp_dna, g.head[i], wholegenome, cg_count, format, &ans);
+        }
+    }
+
+    for (i = 0; i < g.n_edge; ++i){
+        if(g.used_backtrack[i] == 0){
+            //printf("%s\t%d\n", g.head[i], g.seq_len[i]);
+        }
     }
 
     free_graph(&g);

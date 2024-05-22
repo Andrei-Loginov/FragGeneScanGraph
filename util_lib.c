@@ -467,3 +467,38 @@ void print_ivector(int *v, int n) {
     printf("\n");
     return;
 }
+
+Stack create_stack(){
+    Stack ans;
+    ans.max_capacity = 100;
+    ans.curr_capacity = 0;
+    ans.arr = (int*)malloc(ans.max_capacity * sizeof(int));
+    return ans;
+}
+
+void free_stack(Stack *st){
+    if (st->arr)
+        free(st->arr);
+    return;
+}
+
+int top(Stack* st){
+    if (st->curr_capacity == 0) return -10000;
+    return st->arr[st->curr_capacity - 1];
+}
+
+
+int pop(Stack *st){
+    int ans = top(st);
+    --st->curr_capacity;
+    return ans;
+}
+
+void push(Stack* st, int x){
+    if (st->curr_capacity == st->max_capacity){
+        st->max_capacity *= 1.5;
+        st->arr = (int*)realloc(st->arr, st->max_capacity * sizeof (int));
+    }
+    st->arr[st->curr_capacity] = x;
+    ++st->curr_capacity;
+}

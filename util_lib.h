@@ -4,6 +4,12 @@
 
 #define EPS 1e-6
 
+typedef struct {
+    int *arr;
+    size_t curr_capacity;
+    size_t max_capacity;
+} Stack;
+
 double **dmatrix(int num_row, int num_col);
 double *dvector(int nh);
 int **imatrix(int num_row, int num_col);
@@ -40,3 +46,9 @@ void print_ivector(int *v, int n);
 
 void get_rc_dna(char *dna, char *dna1);
 void get_rc_dna_indel(char *dna, char *dna1);
+
+Stack create_stack();
+void free_stack(Stack *st);
+int top(Stack* st);
+int pop(Stack *st);
+void push(Stack* st, int x);
