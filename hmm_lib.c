@@ -6,7 +6,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include "hmm.h"
-#define viterbi_out_flg
+//#define viterbi_out_flg
+
 //#define I_state_debug
 //#define I1_state_debug
 //#define E_state_debug
@@ -20,13 +21,13 @@
 //#define E1_state_debug
 //#define M_rc_debug
 //#define M_inf
-#define crash67
+//#define crash67
 //#define printf_head_indices
 //#define fprint_71_prev
-#define print_graph_after_reading
+//#define print_graph_after_reading
 //#define E1_issue
 //#define non_coding_issue
-#define non_utf8_issue
+
 
 
 void dump_memory(void *p, int size);
@@ -224,7 +225,7 @@ GraphPath restore_path(ViterbiResult *res, Graph *g, int start, int num_state){
     free(vpath);
     free(alpha);
     free(edge_path);
-    printf("%s\tSeq_len = %zu\n", g->head[start], strlen(ans.O));
+    //printf("%s\tSeq_len = %zu\n", g->head[start], strlen(ans.O));
     return ans;
 }
 
@@ -422,11 +423,6 @@ void backtrack_graph_path(HMM *hmm_ptr, TRAIN *train_ptr, FILE *fp_out, FILE *fp
                         }else if (format==1){
                             fprintf(fp_dna, "%s\n", dna_f);
                         }
-#ifdef non_utf8_issue
-                        if(!check_dna_symbols(dna) || !check_dna_symbols(dna_f)){
-                            printf("Bad gene\n");
-                        }
-#endif
                     }
 
                 } else if (codon_start==-1){
@@ -1305,6 +1301,22 @@ void free_graph(Graph *g){
         for (i = 0; i < g->n_edge; ++i){
             free_ViterbiResult(&g->edge_results[i]);
         }
+    }
+
+    if (g->dead_end_flg){
+        free(g->dead_end_flg);
+    }
+
+    if (g->ind){
+        free(g->ind);
+    }
+
+    if (g->order){
+        free(g->order);
+    }
+
+    if (g->used_backtrack){
+        free(g->used_backtrack);
     }
 
     return;
@@ -2770,5 +2782,6 @@ int *ordering(int **adj_matrix, int n_vert){
     free(index);
     free(lowlink);
     free(onStack);
+    free_stack(&reverse_order);
     return  ans;
 }
